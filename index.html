@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Comparador</title>
+    <title>Gasolineras España - Final Pro</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
@@ -66,7 +66,7 @@
             margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;
             border-left: 6px solid #ccc; cursor: pointer;
         }
-        .gas-price { font-weight: bold; font-size: 1.1rem; }
+        .gas-price { font-weight: bold; font-size: 1.1rem; flex-shrink: 0; margin-left: 10px; }
         .c-verde { color: #5efc82 !important; }
         .c-amarillo { color: #ffeb3b !important; }
         .c-rojo { color: #ff5252 !important; }
@@ -222,17 +222,13 @@
             const lat = parseFloat(e.Latitud.replace(',', '.'));
             const lon = parseFloat(e['Longitud (WGS84)'].replace(',', '.'));
             
-            let color = "#ffeb3b"; 
-            let clase = "c-amarillo";
-
+            let color = "#ffeb3b"; let clase = "c-amarillo";
             if (rango > 0) {
                 const perc = (p - minP) / rango;
                 if (perc < 0.25) { color = "#28a745"; clase = "c-verde"; }
                 else if (perc > 0.75) { color = "#dc3545"; clase = "c-rojo"; }
             }
 
-            // UMBRAL ACTUALIZADO A 9: 
-            // Las etiquetas solo salen si el zoom es igual o mayor a 9.
             if (zoom >= 9) {
                 L.marker([lat, lon], { 
                     icon: L.divIcon({ 
@@ -247,7 +243,15 @@
                 const card = document.createElement('div');
                 card.className = 'gas-card';
                 card.style.borderLeftColor = color;
-                card.innerHTML = `<div style="flex:1; overflow:hidden;"><span style="font-weight:bold; font-size:0.8rem;">${e['Rótulo']}</span><br><span style="font-size:0.6rem; color:#bbb;">${e['Dirección']}</span></div><div class="gas-price ${clase}">${p.toFixed(3)}</div>`;
+                // MODIFICACIÓN: Aquí añadimos la localidad a la dirección
+                card.innerHTML = `
+                    <div style="flex:1; overflow:hidden;">
+                        <span style="font-weight:bold; font-size:0.8rem; display:block; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${e['Rótulo']}</span>
+                        <span style="font-size:0.6rem; color:#bbb; display:block; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">
+                            ${e['Dirección']}, ${e['Municipio']}
+                        </span>
+                    </div>
+                    <div class="gas-price ${clase}">${p.toFixed(3)}</div>`;
                 card.onclick = () => map.setView([lat, lon], 15);
                 listaDiv.appendChild(card);
             }
