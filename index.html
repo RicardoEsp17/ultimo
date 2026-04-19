@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Precios Carburante (Móvil)</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <header class="mobile-header">
+        <h1>Precios de Carburantes</h1>
+    </header>
+
+    <div class="fuel-tabs">
+        <button id="btn-gas95" class="fuel-btn btn-gas95" onclick="selectFuel(this, 'gas95')">Gas 95</button>
+        <button id="btn-dizel" class="fuel-btn btn-dizel" onclick="selectFuel(this, 'dizel')">Diésel</button>
+        <button id="btn-dizel-plus" class="fuel-btn btn-dizel-plus" onclick="selectFuel(this, 'dizel_plus')">Diésel +</button>
+    </div>
+
+    <div class="stats-container">
+        <div id="stat-active" class="stat-main">
+            <span id="active-label">Seleccione combustible</span>
+            <strong id="active-price">-- €/L</strong>
+        </div>
+        <div class="mini-breakdown" id="active-breakdown">
+            <span id="val-materia">--</span> <small>Mat.</small> | 
+            <span id="val-hidro">--</span> <small>Hidro.</small> | 
+            <span id="val-iva">--</span> <small>IVA</small>
+        </div>
+    </div>
+
+    <main class="main-content">
+        <div class="search-container">
+            <input type="text" id="input-localidad" placeholder="Localidad o Municipio..." />
+            <button onclick="buscarLocalidad()">🔍</button>
+        </div>
+
+        <div class="map-section">
+            <div id="map"></div>
+        </div>
+
+        <div class="list-section">
+            <div id="sidebar-lista">
+                <p class="msg-ayuda">Acércate al mapa para ver la lista</p>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
