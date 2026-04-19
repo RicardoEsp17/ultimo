@@ -3,124 +3,122 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Gasolineras España - Ancho Fijo</title>
+    <title>Comparador</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
     <style>
-        /* 1. BLOQUEO DE ANCHO TOTAL */
         html, body {
-            margin: 0; padding: 0;
-            width: 100%; height: 100%;
-            overflow-x: hidden; /* Evita el scroll lateral */
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: #f0f0f0;
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            overflow-x: hidden; font-family: sans-serif; background-color: #f0f0f0;
         }
 
         .app-container {
-            width: 100%;
-            max-width: 480px; /* Ancho máximo fijo tipo móvil */
-            margin: 0 auto;
-            background: white;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            box-shadow: 0 0 20px rgba(0,0,0,0.2);
-            position: relative;
-            overflow: hidden; /* Mantiene todo dentro del contenedor */
+            width: 100%; max-width: 480px; margin: 0 auto;
+            background: white; height: 100vh; display: flex; flex-direction: column;
+            box-shadow: 0 0 20px rgba(0,0,0,0.2); position: relative; overflow: hidden;
         }
 
-        header {
-            background: #222; color: white; padding: 12px; text-align: center;
-            flex-shrink: 0; /* No se encoge */
-        }
+        header { background: #222; color: white; padding: 10px; text-align: center; flex-shrink: 0; }
+        header h1 { margin: 0; font-size: 0.9rem; letter-spacing: 1px; }
 
-        /* Cuadrícula de combustible */
         .fuel-grid {
             display: grid; grid-template-columns: 1fr 1fr 1fr;
-            gap: 4px; padding: 10px; background: #fff; border-bottom: 1px solid #eee;
-            flex-shrink: 0;
+            gap: 6px; padding: 10px; background: #fff; border-bottom: 1px solid #eee; flex-shrink: 0;
         }
         .fuel-column { display: flex; flex-direction: column; align-items: center; }
+        
         .fuel-btn {
-            width: 100%; padding: 10px 2px; border: none; border-radius: 6px;
-            font-weight: bold; font-size: 0.7rem; color: white; opacity: 0.3;
-            cursor: pointer; margin-bottom: 5px;
+            width: 100%; padding: 8px 2px; border: none; border-radius: 6px;
+            font-weight: bold; font-size: 0.7rem; color: white; opacity: 0.3; cursor: pointer; margin-bottom: 5px;
         }
-        .fuel-btn.active { opacity: 1; }
+        .fuel-btn.active { opacity: 1; transform: scale(1.02); }
         .btn-gas95 { background: #28a745; }
         .btn-dizel { background: #444; }
         .btn-dizel-plus { background: #dc3545; }
 
-        .fuel-stats { text-align: center; width: 100%; }
-        .avg-val { display: block; font-size: 0.9rem; font-weight: 800; }
-        .details { font-size: 0.55rem; color: #777; line-height: 1.2; }
-
-        /* 2. MAPA ESTABLE: Altura fija o flexible pero contenida */
-        #map { 
-            width: 100%; 
-            height: 40vh; /* Ocupa el 40% de la pantalla */
-            background: #eee;
-            flex-shrink: 0;
-            z-index: 1;
+        .avg-container { 
+            font-size: 0.75rem; font-weight: 800; color: #222; margin-bottom: 5px; 
+            display: flex; gap: 3px; align-items: center;
         }
+        .avg-label { font-size: 0.55rem; color: #777; font-weight: normal; }
 
-        /* Lista con scroll interno */
-        .list-container { 
-            flex-grow: 1; /* Ocupa el resto del espacio */
-            overflow-y: auto; /* Solo scroll vertical aquí */
-            padding: 10px;
-            background: #fafafa;
+        .details-box {
+            width: 100%; background: #f9f9f9; border: 1px solid #ddd; border-radius: 5px;
+            padding: 5px; font-size: 0.58rem; color: #555; line-height: 1.3; box-sizing: border-box;
         }
+        .details-line { display: flex; justify-content: space-between; border-bottom: 1px solid #eee; padding: 1px 0; }
+        .details-line:last-child { border-bottom: none; }
+        .details-line strong { color: #333; }
 
+        #map { width: 100%; height: 35vh; background: #eee; flex-shrink: 0; z-index: 1; }
+
+        .search-container {
+            padding: 10px; background: #fff; border-bottom: 1px solid #ddd;
+            display: flex; gap: 5px; flex-shrink: 0;
+        }
+        .search-container input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+        .search-container button { padding: 10px 15px; background: #222; color: white; border: none; border-radius: 4px; cursor: pointer; }
+
+        .list-container { flex-grow: 1; overflow-y: auto; padding: 10px; background: #fafafa; }
         .gas-card {
             background: #333; color: white; padding: 10px; border-radius: 8px;
             margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;
-            border-left: 6px solid #ccc;
+            border-left: 6px solid #ccc; cursor: pointer;
         }
         .gas-price { font-weight: bold; font-size: 1.1rem; }
-
-        /* Colores */
         .c-verde { color: #5efc82 !important; }
         .c-amarillo { color: #ffeb3b !important; }
         .c-rojo { color: #ff5252 !important; }
 
-        .custom-marker {
-            background: white; border: 1.5px solid #222; border-radius: 3px;
+        .custom-marker { 
+            background: white; border: 1.5px solid #222; border-radius: 3px; 
             font-weight: bold; font-size: 10px; text-align: center;
+            box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
         }
     </style>
 </head>
 <body>
 
 <div class="app-container">
-    <header><strong>⛽ COMPARADOR FIJO</strong></header>
+    <header><h1>⛽ Precio Carburantes</h1></header>
 
     <div class="fuel-grid">
         <div class="fuel-column">
             <button id="btn-gas95" class="fuel-btn btn-gas95 active" onclick="selectFuel(this, 'gas95')">Gas 95</button>
-            <div class="fuel-stats">
-                <span class="avg-val" id="avg-gas95">--</span>
-                <div class="details" id="desc-gas95">Mat: --<br>I.H: 0.472<br>IVA: --</div>
+            <div class="avg-container"><span class="avg-label">MEDIA:</span> <span id="avg-gas95">--</span></div>
+            <div class="details-box" id="desc-gas95">
+                <div class="details-line"><span>Mat:</span> <strong>--</strong></div>
+                <div class="details-line"><span>I.H:</span> <strong>0.472</strong></div>
+                <div class="details-line"><span>IVA:</span> <strong>--</strong></div>
             </div>
         </div>
         <div class="fuel-column">
             <button id="btn-dizel" class="fuel-btn btn-dizel" onclick="selectFuel(this, 'dizel')">Diésel</button>
-            <div class="fuel-stats">
-                <span class="avg-val" id="avg-dizel">--</span>
-                <div class="details" id="desc-dizel">Mat: --<br>I.H: 0.379<br>IVA: --</div>
+            <div class="avg-container"><span class="avg-label">MEDIA:</span> <span id="avg-dizel">--</span></div>
+            <div class="details-box" id="desc-dizel">
+                <div class="details-line"><span>Mat:</span> <strong>--</strong></div>
+                <div class="details-line"><span>I.H:</span> <strong>0.379</strong></div>
+                <div class="details-line"><span>IVA:</span> <strong>--</strong></div>
             </div>
         </div>
         <div class="fuel-column">
             <button id="btn-dizel-plus" class="fuel-btn btn-dizel-plus" onclick="selectFuel(this, 'dizel_plus')">Diésel +</button>
-            <div class="fuel-stats">
-                <span class="avg-val" id="avg-dizel_plus">--</span>
-                <div class="details" id="desc-dizel_plus">Mat: --<br>I.H: 0.379<br>IVA: --</div>
+            <div class="avg-container"><span class="avg-label">MEDIA:</span> <span id="avg-dizel_plus">--</span></div>
+            <div class="details-box" id="desc-dizel_plus">
+                <div class="details-line"><span>Mat:</span> <strong>--</strong></div>
+                <div class="details-line"><span>I.H:</span> <strong>0.379</strong></div>
+                <div class="details-line"><span>IVA:</span> <strong>--</strong></div>
             </div>
         </div>
     </div>
 
     <div id="map"></div>
+
+    <div class="search-container">
+        <input type="text" id="input-busqueda" placeholder="Ciudad o CP..." onkeypress="if(event.key==='Enter') buscarLocalidad()">
+        <button onclick="buscarLocalidad()">🔍</button>
+    </div>
 
     <div class="list-container" id="lista-eess">
         <p style="text-align:center; font-size:0.8rem; color:#999;">Cargando datos...</p>
@@ -130,22 +128,14 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-    let map = L.map('map', { 
-        zoomControl: false, 
-        preferCanvas: true,
-        bounceAtZoomLimits: false // Evita efectos de rebote que ensanchan la página
-    }).setView([40.41, -3.70], 6);
-    
+    let map = L.map('map', { zoomControl: false, preferCanvas: true }).setView([40.41, -3.70], 6);
     let markersLayer = L.layerGroup().addTo(map);
     let datosCompletos = [];
     let tipoActual = 'gas95';
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-    window.onload = () => {
-        cargarDatos();
-        setTimeout(() => map.invalidateSize(), 300);
-    };
+    window.onload = () => { cargarDatos(); setTimeout(() => map.invalidateSize(), 300); };
 
     async function cargarDatos() {
         try {
@@ -155,6 +145,23 @@
             actualizarMedias();
             dibujarTodo();
         } catch (e) { console.error(e); }
+    }
+
+    function normalizarTexto(texto) {
+        return texto ? texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : "";
+    }
+
+    function buscarLocalidad() {
+        const busqueda = normalizarTexto(document.getElementById('input-busqueda').value);
+        if (!busqueda) return;
+        let encontrada = datosCompletos.find(e => normalizarTexto(e.Municipio) === busqueda);
+        if (!encontrada) encontrada = datosCompletos.find(e => normalizarTexto(e.Municipio).startsWith(busqueda));
+        if (!encontrada) encontrada = datosCompletos.find(e => normalizarTexto(e.Municipio).includes(busqueda) || e.CP === busqueda);
+        if (encontrada) {
+            const lat = parseFloat(encontrada.Latitud.replace(',', '.'));
+            const lon = parseFloat(encontrada['Longitud (WGS84)'].replace(',', '.'));
+            map.setView([lat, lon], 13);
+        } else { alert("Localidad no encontrada"); }
     }
 
     function selectFuel(btn, id) {
@@ -178,7 +185,11 @@
                 const iva = media - (media / 1.21);
                 const mat = media - iva - item.ieh;
                 document.getElementById(`avg-${id}`).innerText = media.toFixed(3);
-                document.getElementById(`desc-${id}`).innerHTML = `Mat: ${mat.toFixed(3)}<br>I.H: ${item.ieh.toFixed(3)}<br>IVA: ${iva.toFixed(3)}`;
+                document.getElementById(`desc-${id}`).innerHTML = `
+                    <div class="details-line"><span>Mat:</span> <strong>${mat.toFixed(3)}</strong></div>
+                    <div class="details-line"><span>I.H:</span> <strong>${item.ieh.toFixed(3)}</strong></div>
+                    <div class="details-line"><span>IVA:</span> <strong>${iva.toFixed(3)}</strong></div>
+                `;
             }
         });
     }
@@ -187,7 +198,6 @@
         markersLayer.clearLayers();
         const listaDiv = document.getElementById('lista-eess');
         listaDiv.innerHTML = "";
-
         const bounds = map.getBounds();
         const zoom = map.getZoom();
         const campo = tipoActual === 'gas95' ? 'Precio Gasolina 95 E5' : (tipoActual === 'dizel' ? 'Precio Gasoleo A' : 'Precio Gasoleo Premium');
@@ -200,7 +210,6 @@
         });
 
         if (visibles.length === 0) return;
-
         const precios = visibles.map(e => parseFloat(e[campo].replace(',', '.')));
         const minP = Math.min(...precios);
         const maxP = Math.max(...precios);
@@ -222,17 +231,15 @@
                 else if (perc > 0.75) { color = "#dc3545"; clase = "c-rojo"; }
             }
 
-            if (zoom < 10) {
-                L.circleMarker([lat, lon], {
-                    radius: 4, fillColor: color, color: "#000", weight: 0.5, fillOpacity: 1
-                }).addTo(markersLayer);
-            } else {
-                L.marker([lat, lon], {
-                    icon: L.divIcon({
-                        className: 'custom-marker',
-                        html: `<span class="${clase}">${p.toFixed(3)}</span>`,
-                        iconSize: [46, 16]
-                    })
+            // UMBRAL ACTUALIZADO A 9: 
+            // Las etiquetas solo salen si el zoom es igual o mayor a 9.
+            if (zoom >= 9) {
+                L.marker([lat, lon], { 
+                    icon: L.divIcon({ 
+                        className: 'custom-marker', 
+                        html: `<span class="${clase}">${p.toFixed(3)}</span>`, 
+                        iconSize: [46, 16] 
+                    }) 
                 }).addTo(markersLayer);
             }
 
@@ -240,19 +247,12 @@
                 const card = document.createElement('div');
                 card.className = 'gas-card';
                 card.style.borderLeftColor = color;
-                card.innerHTML = `
-                    <div style="flex:1; overflow:hidden;">
-                        <span style="font-weight:bold; font-size:0.8rem; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${e['Rótulo']}</span>
-                        <span style="font-size:0.6rem; color:#bbb;">${e['Dirección']}</span>
-                    </div>
-                    <div class="gas-price ${clase}">${p.toFixed(3)}</div>
-                `;
+                card.innerHTML = `<div style="flex:1; overflow:hidden;"><span style="font-weight:bold; font-size:0.8rem;">${e['Rótulo']}</span><br><span style="font-size:0.6rem; color:#bbb;">${e['Dirección']}</span></div><div class="gas-price ${clase}">${p.toFixed(3)}</div>`;
                 card.onclick = () => map.setView([lat, lon], 15);
                 listaDiv.appendChild(card);
             }
         });
     }
-
     map.on('moveend', dibujarTodo);
 </script>
 </body>
