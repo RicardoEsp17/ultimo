@@ -3,120 +3,136 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Gasolineras España - Pro</title>
+    <title>Gasolineras España - Logos y Precios</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
     <style>
-        /* --- ESTILOS GENERALES Y ESTRUCTURA --- */
-        html, body {
-            margin: 0; padding: 0; width: 100%; height: 100%;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f0f0f0; overflow: hidden;
+        /* --- ESTILOS GENERALES --- */
+        html, body { 
+            margin: 0; padding: 0; width: 100%; height: 100%; 
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+            background-color: #f0f0f0; overflow: hidden; 
+        }
+        
+        .app-container { 
+            width: 100%; max-width: 480px; margin: 0 auto; 
+            background: white; height: 100vh; display: flex; flex-direction: column; 
+            box-shadow: 0 0 20px rgba(0,0,0,0.2); 
         }
 
-        .app-container {
-            width: 100%; max-width: 480px; margin: 0 auto;
-            background: white; height: 100vh; display: flex; flex-direction: column;
-            box-shadow: 0 0 20px rgba(0,0,0,0.2); position: relative;
-        }
-
-        header { background: #222; color: white; padding: 10px; text-align: center; flex-shrink: 0; }
-        header h1 { margin: 0; font-size: 0.9rem; letter-spacing: 1px; }
+        header { background: #222; color: white; padding: 12px; text-align: center; flex-shrink: 0; }
+        header h1 { margin: 0; font-size: 1rem; letter-spacing: 1px; text-transform: uppercase; }
 
         /* --- REJILLA DE PRECIOS MEDIOS --- */
-        .fuel-grid {
-            display: grid; grid-template-columns: 1fr 1fr 1fr;
-            gap: 6px; padding: 10px; background: #fff; border-bottom: 1px solid #eee; flex-shrink: 0;
+        .fuel-grid { 
+            display: grid; grid-template-columns: 1fr 1fr 1fr; 
+            gap: 8px; padding: 10px; background: #fff; 
+            border-bottom: 1px solid #eee; flex-shrink: 0; 
         }
         .fuel-column { display: flex; flex-direction: column; align-items: center; }
         
-        .fuel-btn {
-            width: 100%; padding: 8px 2px; border: none; border-radius: 6px;
-            font-weight: bold; font-size: 0.7rem; color: white; opacity: 0.3; cursor: pointer; margin-bottom: 5px;
+        .fuel-btn { 
+            width: 100%; padding: 10px 2px; border: none; border-radius: 6px; 
+            font-weight: bold; font-size: 0.75rem; color: white; opacity: 0.3; 
+            cursor: pointer; margin-bottom: 5px; transition: 0.3s;
         }
         .fuel-btn.active { opacity: 1; transform: scale(1.02); }
         .btn-gas95 { background: #28a745; }
         .btn-dizel { background: #444; }
         .btn-dizel-plus { background: #dc3545; }
 
-        .avg-container { 
-            font-size: 0.75rem; font-weight: 800; color: #222; margin-bottom: 5px; 
-            display: flex; gap: 3px; align-items: center;
-        }
-        .avg-label { font-size: 0.55rem; color: #777; font-weight: normal; }
+        .avg-container { font-size: 0.8rem; font-weight: 800; color: #222; margin-bottom: 5px; }
 
-        .details-box {
-            width: 100%; background: #f9f9f9; border: 1px solid #ddd; border-radius: 5px;
-            padding: 5px; font-size: 0.58rem; color: #555; line-height: 1.3; box-sizing: border-box;
+        .details-box { 
+            width: 100%; background: #f9f9f9; border: 1px solid #ddd; 
+            border-radius: 5px; padding: 5px; font-size: 0.6rem; 
+            color: #555; line-height: 1.4; box-sizing: border-box; 
         }
-        .details-line { display: flex; justify-content: space-between; border-bottom: 1px solid #eee; padding: 1px 0; }
+        .details-line { display: flex; justify-content: space-between; border-bottom: 1px solid #eee; }
         .details-line:last-child { border-bottom: none; }
 
         /* --- MAPA Y BUSCADOR --- */
         #map { width: 100%; height: 35vh; background: #eee; flex-shrink: 0; z-index: 1; }
 
-        .search-container {
-            padding: 10px; background: #fff; border-bottom: 1px solid #ddd;
-            display: flex; gap: 5px; flex-shrink: 0;
+        .search-container { 
+            padding: 10px; background: #fff; border-bottom: 1px solid #ddd; 
+            display: flex; gap: 5px; flex-shrink: 0; 
         }
-        .search-container input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
-        .search-container button { padding: 10px 15px; background: #222; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .search-container input { 
+            flex: 1; padding: 10px; border: 1px solid #ccc; 
+            border-radius: 4px; font-size: 14px; 
+        }
+        .search-container button { 
+            padding: 10px 15px; background: #222; color: white; 
+            border: none; border-radius: 4px; cursor: pointer; 
+        }
 
-        /* --- LISTA LATERAL --- */
+        /* --- LISTA DE GASOLINERAS --- */
         .list-container { flex-grow: 1; overflow-y: auto; padding: 10px; background: #fafafa; }
-        .gas-card {
-            background: #333; color: white; padding: 10px; border-radius: 8px;
-            margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;
-            border-left: 6px solid #ccc; cursor: pointer;
+        
+        .gas-card { 
+            background: #333; color: white; padding: 12px; border-radius: 8px; 
+            margin-bottom: 10px; display: flex; align-items: center; 
+            border-left: 6px solid #ccc; cursor: pointer; transition: 0.2s;
         }
-        .gas-price { font-weight: bold; font-size: 1.1rem; flex-shrink: 0; margin-left: 10px; }
+        .gas-card:active { transform: scale(0.98); }
+
+        .logo-lista { 
+            width: 45px; height: 45px; border-radius: 6px; 
+            object-fit: cover; margin-right: 12px; background: white; 
+            flex-shrink: 0;
+        }
+        
+        .gas-info { flex: 1; overflow: hidden; }
+        .gas-name { font-weight: bold; font-size: 0.85rem; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .gas-address { font-size: 0.65rem; color: #bbb; display: block; }
+        
+        .gas-price { font-weight: bold; font-size: 1.1rem; margin-left: 10px; flex-shrink: 0; }
 
         /* --- COLORES DE PRECIO --- */
         .c-verde { color: #5efc82 !important; }
         .c-amarillo { color: #ffeb3b !important; }
         .c-rojo { color: #ff5252 !important; }
 
-        /* --- ESTILOS DE MARCADO Y POPUP --- */
-        .leaflet-marker-icon {
-            border-radius: 50%; border: 2px solid white;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3); background: white;
+        /* --- MARCADO Y POPUP --- */
+        .leaflet-marker-icon { 
+            border-radius: 50%; border: 2px solid white; 
+            box-shadow: 0 2px 6px rgba(0,0,0,0.4); background: white; 
         }
-        .popup-gas { font-size: 0.8rem; min-width: 140px; }
-        .popup-item { display: flex; justify-content: space-between; margin: 3px 0; }
+        .popup-gas { font-size: 0.85rem; min-width: 150px; font-family: sans-serif; }
+        .popup-gas hr { border: 0; border-top: 1px solid #eee; margin: 8px 0; }
+        .popup-item { display: flex; justify-content: space-between; margin-bottom: 3px; }
     </style>
 </head>
 <body>
 
 <div class="app-container">
-    <header><h1>⛽ Precio Carburantes</h1></header>
+    <header><h1>Gasolineras España</h1></header>
 
     <div class="fuel-grid">
         <div class="fuel-column">
             <button id="btn-gas95" class="fuel-btn btn-gas95 active" onclick="selectFuel(this, 'gas95')">Gas 95</button>
-            <div class="avg-container"><span class="avg-label">MEDIA:</span> <span id="avg-gas95">--</span></div>
+            <div class="avg-container"><span id="avg-gas95">--</span></div>
             <div class="details-box" id="desc-gas95">
-                <div class="details-line"><span>Mat:</span> <strong class="val">--</strong></div>
-                <div class="details-line"><span>I.H:</span> <strong>0.472</strong></div>
-                <div class="details-line"><span>IVA:</span> <strong class="val">--</strong></div>
+                <div class="details-line"><span>Mat:</span> <strong class="v">--</strong></div>
+                <div class="details-line"><span>IVA:</span> <strong class="v">--</strong></div>
             </div>
         </div>
         <div class="fuel-column">
             <button id="btn-dizel" class="fuel-btn btn-dizel" onclick="selectFuel(this, 'dizel')">Diésel</button>
-            <div class="avg-container"><span class="avg-label">MEDIA:</span> <span id="avg-dizel">--</span></div>
+            <div class="avg-container"><span id="avg-dizel">--</span></div>
             <div class="details-box" id="desc-dizel">
-                <div class="details-line"><span>Mat:</span> <strong class="val">--</strong></div>
-                <div class="details-line"><span>I.H:</span> <strong>0.379</strong></div>
-                <div class="details-line"><span>IVA:</span> <strong class="val">--</strong></div>
+                <div class="details-line"><span>Mat:</span> <strong class="v">--</strong></div>
+                <div class="details-line"><span>IVA:</span> <strong class="v">--</strong></div>
             </div>
         </div>
         <div class="fuel-column">
             <button id="btn-dizel-plus" class="fuel-btn btn-dizel-plus" onclick="selectFuel(this, 'dizel_plus')">Diésel +</button>
-            <div class="avg-container"><span class="avg-label">MEDIA:</span> <span id="avg-dizel_plus">--</span></div>
+            <div class="avg-container"><span id="avg-dizel_plus">--</span></div>
             <div class="details-box" id="desc-dizel_plus">
-                <div class="details-line"><span>Mat:</span> <strong class="val">--</strong></div>
-                <div class="details-line"><span>I.H:</span> <strong>0.379</strong></div>
-                <div class="details-line"><span>IVA:</span> <strong class="val">--</strong></div>
+                <div class="details-line"><span>Mat:</span> <strong class="v">--</strong></div>
+                <div class="details-line"><span>IVA:</span> <strong class="v">--</strong></div>
             </div>
         </div>
     </div>
@@ -124,27 +140,46 @@
     <div id="map"></div>
 
     <div class="search-container">
-        <input type="text" id="input-busqueda" placeholder="Ciudad o CP..." onkeypress="if(event.key==='Enter') buscarLocalidad()">
+        <input type="text" id="input-busqueda" placeholder="Ciudad, Municipio o CP..." onkeypress="if(event.key==='Enter') buscarLocalidad()">
         <button onclick="buscarLocalidad()">🔍</button>
     </div>
 
     <div class="list-container" id="lista-eess">
-        <p style="text-align:center; font-size:0.8rem; color:#999;">Cargando datos...</p>
+        <p style="text-align:center; padding:20px; color:#999;">Cargando datos oficiales...</p>
     </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-    let map = L.map('map', { zoomControl: false, preferCanvas: true }).setView([40.41, -3.70], 6);
+    let map = L.map('map', { zoomControl: false }).setView([40.41, -3.70], 6);
     let markersLayer = L.layerGroup().addTo(map);
     let datosCompletos = [];
     let tipoActual = 'gas95';
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-    window.onload = () => { cargarDatos(); setTimeout(() => map.invalidateSize(), 300); };
+    // Lógica de asignación de logotipos
+    function getLogoUrl(rotulo) {
+        const r = rotulo.toLowerCase();
+        
+        if (r.includes('repsol')) return 'repsol.jpg';
+        if (r.includes('cepsa')) return 'cepsa.jpg';
+        if (r.includes('campsa')) return 'campsa.png';
+        if (r.includes('galp')) return 'galp.jpg';
+        if (r.includes('moeve')) return 'moeve.jpeg';
+        
+        // Plenoil y Plenergy usan el mismo logo
+        if (r.includes('plenoil') || r.includes('plenergy')) return 'plenoil.png';
+        
+        if (r.includes('q8')) return 'q8.png';
+        if (r.includes('petroprix')) return 'petroprix.jpg';
+        if (r.includes('ballenoil')) return 'ballenoil.png';
+        
+        return 'default.jpg'; 
+    }
 
+    // Carga de datos desde la API del Ministerio
     async function cargarDatos() {
         try {
             const res = await fetch('https://sedeaplicaciones.minetur.gob.es/ServiciosRESTCarburantes/PreciosCarburantes/EstacionesTerrestres/');
@@ -152,22 +187,10 @@
             datosCompletos = data.ListaEESSPrecio.filter(e => e['Tipo Venta'] === 'P');
             actualizarMedias();
             dibujarTodo();
-        } catch (e) { console.error(e); }
-    }
-
-    function normalizarTexto(texto) {
-        return texto ? texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : "";
-    }
-
-    function buscarLocalidad() {
-        const busqueda = normalizarTexto(document.getElementById('input-busqueda').value);
-        if (!busqueda) return;
-        let encontrada = datosCompletos.find(e => normalizarTexto(e.Municipio) === busqueda || e.CP === busqueda);
-        if (encontrada) {
-            const lat = parseFloat(encontrada.Latitud.replace(',', '.'));
-            const lon = parseFloat(encontrada['Longitud (WGS84)'].replace(',', '.'));
-            map.setView([lat, lon], 13);
-        } else { alert("Localidad no encontrada"); }
+        } catch (e) { 
+            console.error("Error cargando API:", e);
+            document.getElementById('lista-eess').innerHTML = "<p style='color:red; text-align:center;'>Error al conectar con la API de precios.</p>";
+        }
     }
 
     function selectFuel(btn, id) {
@@ -177,36 +200,23 @@
         dibujarTodo();
     }
 
-    function actualizarMedias() {
-        const config = {
-            'gas95': { campo: 'Precio Gasolina 95 E5', ieh: 0.472 },
-            'dizel': { campo: 'Precio Gasoleo A', ieh: 0.379 },
-            'dizel_plus': { campo: 'Precio Gasoleo Premium', ieh: 0.379 }
-        };
-        Object.keys(config).forEach(id => {
-            const item = config[id];
-            let ps = datosCompletos.map(e => e[item.campo]).filter(p => p).map(p => parseFloat(p.replace(',', '.')));
-            if (ps.length) {
-                const media = ps.reduce((a, b) => a + b, 0) / ps.length;
-                const iva = media - (media / 1.21);
-                const mat = media - iva - item.ieh;
-                document.getElementById(`avg-${id}`).innerText = media.toFixed(3);
-                const container = document.getElementById(`desc-${id}`);
-                container.querySelectorAll('.val')[0].innerText = mat.toFixed(3);
-                container.querySelectorAll('.val')[1].innerText = iva.toFixed(3);
-            }
-        });
-    }
-
     function dibujarTodo() {
         markersLayer.clearLayers();
         const listaDiv = document.getElementById('lista-eess');
         listaDiv.innerHTML = "";
+        
         const bounds = map.getBounds();
         const zoom = map.getZoom();
         
-        const campo = tipoActual === 'gas95' ? 'Precio Gasolina 95 E5' : (tipoActual === 'dizel' ? 'Precio Gasoleo A' : 'Precio Gasoleo Premium');
+        // Mapeo de campos de la API
+        const campos = {
+            'gas95': 'Precio Gasolina 95 E5',
+            'dizel': 'Precio Gasoleo A',
+            'dizel_plus': 'Precio Gasoleo Premium'
+        };
+        const campo = campos[tipoActual];
 
+        // Filtrar solo las que están en el área visible del mapa
         let visibles = datosCompletos.filter(e => {
             if (!e[campo]) return false;
             const lat = parseFloat(e.Latitud.replace(',', '.'));
@@ -214,25 +224,26 @@
             return bounds.contains([lat, lon]);
         });
 
-        if (visibles.length === 0) return;
+        if (visibles.length === 0) {
+            listaDiv.innerHTML = "<p style='text-align:center; padding:20px;'>Acércate o busca una zona para ver precios.</p>";
+            return;
+        }
+
+        // Ordenar por precio más barato
         visibles.sort((a, b) => parseFloat(a[campo].replace(',','.')) - parseFloat(b[campo].replace(',','.')));
 
         const precios = visibles.map(e => parseFloat(e[campo].replace(',', '.')));
-        const minP = Math.min(...precios), maxP = Math.max(...precios), rango = maxP - minP;
-
-        // Icono personalizado
-        const iconGas = L.icon({
-            iconUrl: 'default.jpg',
-            iconSize: [30, 30],
-            iconAnchor: [15, 15],
-            popupAnchor: [0, -15]
-        });
+        const minP = Math.min(...precios);
+        const maxP = Math.max(...precios);
+        const rango = maxP - minP;
 
         visibles.forEach((e, i) => {
             const p = parseFloat(e[campo].replace(',', '.'));
             const lat = parseFloat(e.Latitud.replace(',', '.'));
             const lon = parseFloat(e['Longitud (WGS84)'].replace(',', '.'));
+            const logo = getLogoUrl(e['Rótulo']);
             
+            // Color según si es barato o caro en la zona actual
             let clase = "c-amarillo";
             if (rango > 0) {
                 const perc = (p - minP) / rango;
@@ -240,40 +251,98 @@
                 else if (perc > 0.75) clase = "c-rojo";
             }
 
-            // Marcadores (solo a partir de zoom 9)
-            if (zoom >= 9) {
-                const p95 = e['Precio Gasolina 95 E5'] || "N/A";
-                const pA = e['Precio Gasoleo A'] || "N/A";
-                const pAP = e['Precio Gasoleo Premium'] || "N/A";
+            // Marcadores en el mapa (se activan a partir de zoom 10)
+            if (zoom >= 10) {
+                const icon = L.icon({ 
+                    iconUrl: logo, 
+                    iconSize: [32, 32], 
+                    iconAnchor: [16, 16], 
+                    popupAnchor: [0, -16] 
+                });
+
+                const p95 = e['Precio Gasolina 95 E5'] || '--';
+                const pA = e['Precio Gasoleo A'] || '--';
+                const pAP = e['Precio Gasoleo Premium'] || '--';
 
                 const popupHtml = `
                     <div class="popup-gas">
-                        <strong>${e['Rótulo']}</strong><hr>
-                        <div class="popup-item"><span>G95:</span> <b>${p95}€</b></div>
-                        <div class="popup-item"><span>Diésel:</span> <b>${pA}€</b></div>
-                        <div class="popup-item"><span>Diésel+:</span> <b>${pAP}€</b></div>
+                        <strong>${e['Rótulo']}</strong><br>
+                        <small>${e['Dirección']}</small><hr>
+                        <div class="popup-item"><span>Gasolina 95:</span> <b>${p95}€</b></div>
+                        <div class="popup-item"><span>Diésel A:</span> <b>${pA}€</b></div>
+                        <div class="popup-item"><span>Diésel +:</span> <b>${pAP}€</b></div>
                     </div>`;
 
-                L.marker([lat, lon], { icon: iconGas }).addTo(markersLayer).bindPopup(popupHtml);
+                L.marker([lat, lon], { icon }).addTo(markersLayer).bindPopup(popupHtml);
             }
 
-            // Lista (Top 50 visibles)
+            // Añadir a la lista (solo los 50 más baratos visibles)
             if (i < 50) {
                 const card = document.createElement('div');
                 card.className = 'gas-card';
                 card.innerHTML = `
-                    <div style="flex:1; overflow:hidden;">
-                        <span style="font-weight:bold; font-size:0.8rem; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${e['Rótulo']}</span>
-                        <span style="font-size:0.6rem; color:#bbb;">${e['Dirección']}, ${e['Municipio']}</span>
+                    <img src="${logo}" class="logo-lista" onerror="this.src='default.jpg'">
+                    <div class="gas-info">
+                        <span class="gas-name">${e['Rótulo']}</span>
+                        <span class="gas-address">${e['Dirección']}, ${e['Municipio']}</span>
                     </div>
                     <div class="gas-price ${clase}">${p.toFixed(3)}</div>`;
-                card.onclick = () => map.setView([lat, lon], 16);
+                card.onclick = () => {
+                    map.setView([lat, lon], 16);
+                };
                 listaDiv.appendChild(card);
             }
         });
     }
 
+    function actualizarMedias() {
+        const config = { 
+            'gas95': { campo: 'Precio Gasolina 95 E5', ieh: 0.472 }, 
+            'dizel': { campo: 'Precio Gasoleo A', ieh: 0.379 }, 
+            'dizel_plus': { campo: 'Precio Gasoleo Premium', ieh: 0.379 } 
+        };
+
+        Object.keys(config).forEach(id => {
+            const conf = config[id];
+            let ps = datosCompletos.map(e => e[conf.campo]).filter(p => p).map(p => parseFloat(p.replace(',', '.')));
+            
+            if (ps.length) {
+                const media = ps.reduce((a, b) => a + b, 0) / ps.length;
+                document.getElementById(`avg-${id}`).innerText = media.toFixed(3) + " €/L";
+                
+                const iva = media - (media / 1.21);
+                const mat = media - iva - conf.ieh;
+                
+                const container = document.getElementById(`desc-${id}`);
+                container.querySelectorAll('.v')[0].innerText = mat.toFixed(3);
+                container.querySelectorAll('.v')[1].innerText = iva.toFixed(3);
+            }
+        });
+    }
+
+    function buscarLocalidad() {
+        const input = document.getElementById('input-busqueda').value.toLowerCase().trim();
+        if (!input) return;
+
+        const e = datosCompletos.find(x => 
+            x.Municipio.toLowerCase().includes(input) || 
+            x.Localidad.toLowerCase().includes(input) || 
+            x.CP === input
+        );
+
+        if (e) {
+            const lat = parseFloat(e.Latitud.replace(',','.'));
+            const lon = parseFloat(e['Longitud (WGS84)'].replace(',','.'));
+            map.setView([lat, lon], 13);
+        } else {
+            alert("No se ha encontrado ninguna gasolinera en esa zona.");
+        }
+    }
+
+    // Inicio
+    window.onload = cargarDatos;
     map.on('moveend', dibujarTodo);
 </script>
+
 </body>
 </html>
