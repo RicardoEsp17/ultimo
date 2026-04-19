@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Gasolineras España - Logos y Precios</title>
+    <title>Gasolineras España - Lista Sincronizada</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
@@ -11,7 +11,7 @@
         /* --- ESTILOS GENERALES --- */
         html, body { 
             margin: 0; padding: 0; width: 100%; height: 100%; 
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+            font-family: 'Segoe UI', Roboto, Arial, sans-serif; 
             background-color: #f0f0f0; overflow: hidden; 
         }
         
@@ -24,7 +24,7 @@
         header { background: #222; color: white; padding: 12px; text-align: center; flex-shrink: 0; }
         header h1 { margin: 0; font-size: 1rem; letter-spacing: 1px; text-transform: uppercase; }
 
-        /* --- REJILLA DE PRECIOS MEDIOS --- */
+        /* --- PRECIOS MEDIOS --- */
         .fuel-grid { 
             display: grid; grid-template-columns: 1fr 1fr 1fr; 
             gap: 8px; padding: 10px; background: #fff; 
@@ -68,7 +68,7 @@
             border: none; border-radius: 4px; cursor: pointer; 
         }
 
-        /* --- LISTA DE GASOLINERAS --- */
+        /* --- LISTA --- */
         .list-container { flex-grow: 1; overflow-y: auto; padding: 10px; background: #fafafa; }
         
         .gas-card { 
@@ -76,7 +76,6 @@
             margin-bottom: 10px; display: flex; align-items: center; 
             border-left: 6px solid #ccc; cursor: pointer; transition: 0.2s;
         }
-        .gas-card:active { transform: scale(0.98); }
 
         .logo-lista { 
             width: 45px; height: 45px; border-radius: 6px; 
@@ -90,17 +89,17 @@
         
         .gas-price { font-weight: bold; font-size: 1.1rem; margin-left: 10px; flex-shrink: 0; }
 
-        /* --- COLORES DE PRECIO --- */
+        /* --- COLORES --- */
         .c-verde { color: #5efc82 !important; }
         .c-amarillo { color: #ffeb3b !important; }
         .c-rojo { color: #ff5252 !important; }
 
-        /* --- MARCADO Y POPUP --- */
+        /* --- POPUP --- */
         .leaflet-marker-icon { 
             border-radius: 50%; border: 2px solid white; 
             box-shadow: 0 2px 6px rgba(0,0,0,0.4); background: white; 
         }
-        .popup-gas { font-size: 0.85rem; min-width: 150px; font-family: sans-serif; }
+        .popup-gas { font-size: 0.85rem; min-width: 150px; }
         .popup-gas hr { border: 0; border-top: 1px solid #eee; margin: 8px 0; }
         .popup-item { display: flex; justify-content: space-between; margin-bottom: 3px; }
     </style>
@@ -140,12 +139,12 @@
     <div id="map"></div>
 
     <div class="search-container">
-        <input type="text" id="input-busqueda" placeholder="Ciudad, Municipio o CP..." onkeypress="if(event.key==='Enter') buscarLocalidad()">
+        <input type="text" id="input-busqueda" placeholder="Ciudad o CP..." onkeypress="if(event.key==='Enter') buscarLocalidad()">
         <button onclick="buscarLocalidad()">🔍</button>
     </div>
 
     <div class="list-container" id="lista-eess">
-        <p style="text-align:center; padding:20px; color:#999;">Cargando datos oficiales...</p>
+        <p style="text-align:center; padding:20px; color:#999;">Acércate al mapa para ver la lista.</p>
     </div>
 </div>
 
@@ -156,30 +155,13 @@
     let markersLayer = L.layerGroup().addTo(map);
     let datosCompletos = [];
     let tipoActual = 'gas95';
+    
+    const IMG_DEFAULT = 'default.jpg'; 
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-    // Lógica de asignación de logotipos
-    function getLogoUrl(rotulo) {
-        const r = rotulo.toLowerCase();
-        
-        if (r.includes('repsol')) return 'repsol.jpg';
-        if (r.includes('cepsa')) return 'cepsa.jpg';
-        if (r.includes('campsa')) return 'campsa.png';
-        if (r.includes('galp')) return 'galp.jpg';
-        if (r.includes('moeve')) return 'moeve.jpeg';
-        
-        // Plenoil y Plenergy usan el mismo logo
-        if (r.includes('plenoil') || r.includes('plenergy')) return 'plenoil.png';
-        
-        if (r.includes('q8')) return 'q8.png';
-        if (r.includes('petroprix')) return 'petroprix.jpg';
-        if (r.includes('ballenoil')) return 'ballenoil.png';
-        
-        return 'default.jpg'; 
-    }
+    function getLogoUrl(rotulo) { const r = rotulo.toLowerCase(); if (r.includes('repsol')) return 'repsol.jpg'; if (r.includes('cepsa')) return 'cepsa.jpg'; if (r.includes('campsa')) return 'campsa.png'; if (r.includes('galp')) return 'galp.jpg'; if (r.includes('moeve')) return 'moeve.jpeg'; if (r.includes('plenoil') || r.includes('plenergy')) return 'plenoil.png'; if (r.includes('q8')) return 'q8.png'; if (r.includes('petroprix')) return 'petroprix.jpg'; if (r.includes('ballenoil')) return 'ballenoil.png'; if (r.includes('bp')) return 'bp.jpg'; if (r.includes('bonarea')) return 'bonarea.jpg'; if (r.includes('shell')) return 'shell.png'; if (r.includes('gasexpress')) return 'gasexpress.jpeg'; return IMG_DEFAULT; }
 
-    // Carga de datos desde la API del Ministerio
     async function cargarDatos() {
         try {
             const res = await fetch('https://sedeaplicaciones.minetur.gob.es/ServiciosRESTCarburantes/PreciosCarburantes/EstacionesTerrestres/');
@@ -187,10 +169,7 @@
             datosCompletos = data.ListaEESSPrecio.filter(e => e['Tipo Venta'] === 'P');
             actualizarMedias();
             dibujarTodo();
-        } catch (e) { 
-            console.error("Error cargando API:", e);
-            document.getElementById('lista-eess').innerHTML = "<p style='color:red; text-align:center;'>Error al conectar con la API de precios.</p>";
-        }
+        } catch (e) { console.error(e); }
     }
 
     function selectFuel(btn, id) {
@@ -203,20 +182,19 @@
     function dibujarTodo() {
         markersLayer.clearLayers();
         const listaDiv = document.getElementById('lista-eess');
-        listaDiv.innerHTML = "";
-        
         const bounds = map.getBounds();
         const zoom = map.getZoom();
         
-        // Mapeo de campos de la API
-        const campos = {
-            'gas95': 'Precio Gasolina 95 E5',
-            'dizel': 'Precio Gasoleo A',
-            'dizel_plus': 'Precio Gasoleo Premium'
-        };
+        const campos = { 'gas95': 'Precio Gasolina 95 E5', 'dizel': 'Precio Gasoleo A', 'dizel_plus': 'Precio Gasoleo Premium' };
         const campo = campos[tipoActual];
 
-        // Filtrar solo las que están en el área visible del mapa
+        // 1. Si el zoom es menor a 10, no mostramos logos ni lista detallada
+        if (zoom < 10) {
+            listaDiv.innerHTML = `<p style="text-align:center; padding:20px; color:#999;">Haz zoom en el mapa para ver los logos y el listado de precios.</p>`;
+            return;
+        }
+
+        // 2. Filtrar visibles
         let visibles = datosCompletos.filter(e => {
             if (!e[campo]) return false;
             const lat = parseFloat(e.Latitud.replace(',', '.'));
@@ -225,25 +203,24 @@
         });
 
         if (visibles.length === 0) {
-            listaDiv.innerHTML = "<p style='text-align:center; padding:20px;'>Acércate o busca una zona para ver precios.</p>";
+            listaDiv.innerHTML = `<p style="text-align:center; padding:20px; color:#999;">No hay gasolineras en esta zona.</p>`;
             return;
         }
 
-        // Ordenar por precio más barato
+        // 3. Ordenar y preparar colores
         visibles.sort((a, b) => parseFloat(a[campo].replace(',','.')) - parseFloat(b[campo].replace(',','.')));
-
-        const precios = visibles.map(e => parseFloat(e[campo].replace(',', '.')));
-        const minP = Math.min(...precios);
-        const maxP = Math.max(...precios);
+        const minP = parseFloat(visibles[0][campo].replace(',','.'));
+        const maxP = parseFloat(visibles[visibles.length - 1][campo].replace(',','.'));
         const rango = maxP - minP;
 
-        visibles.forEach((e, i) => {
+        listaDiv.innerHTML = ""; // Limpiar lista para rellenar
+
+        visibles.forEach((e) => {
             const p = parseFloat(e[campo].replace(',', '.'));
             const lat = parseFloat(e.Latitud.replace(',', '.'));
             const lon = parseFloat(e['Longitud (WGS84)'].replace(',', '.'));
             const logo = getLogoUrl(e['Rótulo']);
             
-            // Color según si es barato o caro en la zona actual
             let clase = "c-amarillo";
             if (rango > 0) {
                 const perc = (p - minP) / rango;
@@ -251,68 +228,38 @@
                 else if (perc > 0.75) clase = "c-rojo";
             }
 
-            // Marcadores en el mapa (se activan a partir de zoom 10)
-            if (zoom >= 10) {
-                const icon = L.icon({ 
-                    iconUrl: logo, 
-                    iconSize: [32, 32], 
-                    iconAnchor: [16, 16], 
-                    popupAnchor: [0, -16] 
-                });
+            // AÑADIR AL MAPA
+            const icon = L.icon({ iconUrl: logo, iconSize: [32, 32], iconAnchor: [16, 16], popupAnchor: [0, -16] });
+            const popup = `<div class="popup-gas"><strong>${e['Rótulo']}</strong><hr>
+                95: ${e['Precio Gasolina 95 E5'] || '--'}€<br>
+                A: ${e['Precio Gasoleo A'] || '--'}€<br>
+                A+: ${e['Precio Gasoleo Premium'] || '--'}€</div>`;
+            L.marker([lat, lon], { icon }).addTo(markersLayer).bindPopup(popup);
 
-                const p95 = e['Precio Gasolina 95 E5'] || '--';
-                const pA = e['Precio Gasoleo A'] || '--';
-                const pAP = e['Precio Gasoleo Premium'] || '--';
-
-                const popupHtml = `
-                    <div class="popup-gas">
-                        <strong>${e['Rótulo']}</strong><br>
-                        <small>${e['Dirección']}</small><hr>
-                        <div class="popup-item"><span>Gasolina 95:</span> <b>${p95}€</b></div>
-                        <div class="popup-item"><span>Diésel A:</span> <b>${pA}€</b></div>
-                        <div class="popup-item"><span>Diésel +:</span> <b>${pAP}€</b></div>
-                    </div>`;
-
-                L.marker([lat, lon], { icon }).addTo(markersLayer).bindPopup(popupHtml);
-            }
-
-            // Añadir a la lista (solo los 50 más baratos visibles)
-            if (i < 50) {
-                const card = document.createElement('div');
-                card.className = 'gas-card';
-                card.innerHTML = `
-                    <img src="${logo}" class="logo-lista" onerror="this.src='default.jpg'">
-                    <div class="gas-info">
-                        <span class="gas-name">${e['Rótulo']}</span>
-                        <span class="gas-address">${e['Dirección']}, ${e['Municipio']}</span>
-                    </div>
-                    <div class="gas-price ${clase}">${p.toFixed(3)}</div>`;
-                card.onclick = () => {
-                    map.setView([lat, lon], 16);
-                };
-                listaDiv.appendChild(card);
-            }
+            // AÑADIR A LA LISTA (Todas las visibles en el mapa)
+            const card = document.createElement('div');
+            card.className = 'gas-card';
+            card.innerHTML = `
+                <img src="${logo}" class="logo-lista" onerror="this.src='${IMG_DEFAULT}'">
+                <div class="gas-info">
+                    <span class="gas-name">${e['Rótulo']}</span>
+                    <span class="gas-address">${e['Dirección']}, ${e['Municipio']}</span>
+                </div>
+                <div class="gas-price ${clase}">${p.toFixed(3)}</div>`;
+            card.onclick = () => map.setView([lat, lon], 16);
+            listaDiv.appendChild(card);
         });
     }
 
     function actualizarMedias() {
-        const config = { 
-            'gas95': { campo: 'Precio Gasolina 95 E5', ieh: 0.472 }, 
-            'dizel': { campo: 'Precio Gasoleo A', ieh: 0.379 }, 
-            'dizel_plus': { campo: 'Precio Gasoleo Premium', ieh: 0.379 } 
-        };
-
+        const config = { 'gas95': 'Precio Gasolina 95 E5', 'dizel': 'Precio Gasoleo A', 'dizel_plus': 'Precio Gasoleo Premium' };
         Object.keys(config).forEach(id => {
-            const conf = config[id];
-            let ps = datosCompletos.map(e => e[conf.campo]).filter(p => p).map(p => parseFloat(p.replace(',', '.')));
-            
+            let ps = datosCompletos.map(e => e[config[id]]).filter(p => p).map(p => parseFloat(p.replace(',', '.')));
             if (ps.length) {
                 const media = ps.reduce((a, b) => a + b, 0) / ps.length;
                 document.getElementById(`avg-${id}`).innerText = media.toFixed(3) + " €/L";
-                
                 const iva = media - (media / 1.21);
-                const mat = media - iva - conf.ieh;
-                
+                const mat = media - iva - (id === 'gas95' ? 0.472 : 0.379);
                 const container = document.getElementById(`desc-${id}`);
                 container.querySelectorAll('.v')[0].innerText = mat.toFixed(3);
                 container.querySelectorAll('.v')[1].innerText = iva.toFixed(3);
@@ -321,28 +268,13 @@
     }
 
     function buscarLocalidad() {
-        const input = document.getElementById('input-busqueda').value.toLowerCase().trim();
-        if (!input) return;
-
-        const e = datosCompletos.find(x => 
-            x.Municipio.toLowerCase().includes(input) || 
-            x.Localidad.toLowerCase().includes(input) || 
-            x.CP === input
-        );
-
-        if (e) {
-            const lat = parseFloat(e.Latitud.replace(',','.'));
-            const lon = parseFloat(e['Longitud (WGS84)'].replace(',','.'));
-            map.setView([lat, lon], 13);
-        } else {
-            alert("No se ha encontrado ninguna gasolinera en esa zona.");
-        }
+        const b = document.getElementById('input-busqueda').value.toLowerCase();
+        const e = datosCompletos.find(x => x.Municipio.toLowerCase().includes(b) || x.CP === b);
+        if (e) map.setView([parseFloat(e.Latitud.replace(',','.')), parseFloat(e['Longitud (WGS84)'].replace(',','.'))], 13);
     }
 
-    // Inicio
     window.onload = cargarDatos;
     map.on('moveend', dibujarTodo);
 </script>
-
 </body>
 </html>
