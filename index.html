@@ -3,52 +3,244 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Precios Carburante (Móvil)</title>
+    <title>Gasolineras España - Colores Dinámicos</title>
+    
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="style.css">
+    
+    <style>
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #f4f4f4; display: flex; flex-direction: column;
+        }
+        .app-container {
+            max-width: 480px; margin: 0 auto; background: white;
+            min-height: 100vh; display: flex; flex-direction: column;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        header { background: #222; color: white; padding: 12px; text-align: center; }
+        header h1 { margin: 0; font-size: 1rem; text-transform: uppercase; }
+
+        .fuel-grid {
+            display: grid; grid-template-columns: 1fr 1fr 1fr;
+            gap: 4px; padding: 10px; background: #fff; border-bottom: 1px solid #eee;
+        }
+        .fuel-column { display: flex; flex-direction: column; align-items: center; }
+        .fuel-btn {
+            width: 100%; padding: 10px 2px; border: none; border-radius: 6px;
+            font-weight: bold; font-size: 0.7rem; color: white; opacity: 0.3;
+            transition: 0.2s; cursor: pointer; margin-bottom: 5px;
+        }
+        .fuel-btn.active { opacity: 1; transform: scale(1.02); }
+        .btn-gas95 { background: #28a745; }
+        .btn-dizel { background: #444; }
+        .btn-dizel-plus { background: #dc3545; }
+
+        .fuel-stats { text-align: center; width: 100%; }
+        .avg-val { display: block; font-size: 0.9rem; font-weight: 800; color: #222; }
+        .details { font-size: 0.55rem; color: #777; line-height: 1.2; border-top: 1px solid #f0f0f0; margin-top: 3px; padding-top: 3px; }
+
+        #map { width: 100%; height: 380px; background: #eee; }
+
+        .list-container { flex: 1; padding: 10px; overflow-y: auto; background: #fafafa; }
+        .gas-card {
+            background: #333; color: white; padding: 10px; border-radius: 8px;
+            margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;
+            border-left: 6px solid #ccc;
+        }
+        .gas-info { flex: 1; overflow: hidden; }
+        .gas-name { font-weight: bold; font-size: 0.8rem; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .gas-address { font-size: 0.65rem; color: #bbb; }
+        .gas-price { font-weight: bold; font-size: 1.1rem; padding-left: 10px; }
+
+        /* Estilos de marcadores y colores */
+        .custom-marker {
+            background: white; border: 1.5px solid #222; border-radius: 3px;
+            font-weight: bold; font-size: 10px; text-align: center; padding: 1px;
+        }
+        
+        /* Clases de colores para la lista y el mapa */
+        .c-verde { color: #5efc82 !important; }   /* Barato */
+        .c-amarillo { color: #ffeb3b !important; } /* Intermedio */
+        .c-rojo { color: #ff5252 !important; }    /* Caro */
+    </style>
 </head>
 <body>
 
-    <header class="mobile-header">
-        <h1>Precios de Carburantes</h1>
-    </header>
+<div class="app-container">
+    <header><h1>⛽ Comparador Dinámico</h1></header>
 
-    <div class="fuel-tabs">
-        <button id="btn-gas95" class="fuel-btn btn-gas95" onclick="selectFuel(this, 'gas95')">Gas 95</button>
-        <button id="btn-dizel" class="fuel-btn btn-dizel" onclick="selectFuel(this, 'dizel')">Diésel</button>
-        <button id="btn-dizel-plus" class="fuel-btn btn-dizel-plus" onclick="selectFuel(this, 'dizel_plus')">Diésel +</button>
-    </div>
-
-    <div class="stats-container">
-        <div id="stat-active" class="stat-main">
-            <span id="active-label">Seleccione combustible</span>
-            <strong id="active-price">-- €/L</strong>
-        </div>
-        <div class="mini-breakdown" id="active-breakdown">
-            <span id="val-materia">--</span> <small>Mat.</small> | 
-            <span id="val-hidro">--</span> <small>Hidro.</small> | 
-            <span id="val-iva">--</span> <small>IVA</small>
-        </div>
-    </div>
-
-    <main class="main-content">
-        <div class="search-container">
-            <input type="text" id="input-localidad" placeholder="Localidad o Municipio..." />
-            <button onclick="buscarLocalidad()">🔍</button>
-        </div>
-
-        <div class="map-section">
-            <div id="map"></div>
-        </div>
-
-        <div class="list-section">
-            <div id="sidebar-lista">
-                <p class="msg-ayuda">Acércate al mapa para ver la lista</p>
+    <div class="fuel-grid">
+        <div class="fuel-column">
+            <button id="btn-gas95" class="fuel-btn btn-gas95 active" onclick="selectFuel(this, 'gas95')">Gas 95</button>
+            <div class="fuel-stats">
+                <span class="avg-val" id="avg-gas95">--</span>
+                <div class="details" id="desc-gas95">Mat: --<br>I.H: 0.472<br>IVA: --</div>
             </div>
         </div>
-    </main>
+        <div class="fuel-column">
+            <button id="btn-dizel" class="fuel-btn btn-dizel" onclick="selectFuel(this, 'dizel')">Diésel</button>
+            <div class="fuel-stats">
+                <span class="avg-val" id="avg-dizel">--</span>
+                <div class="details" id="desc-dizel">Mat: --<br>I.H: 0.379<br>IVA: --</div>
+            </div>
+        </div>
+        <div class="fuel-column">
+            <button id="btn-dizel-plus" class="fuel-btn btn-dizel-plus" onclick="selectFuel(this, 'dizel_plus')">Diésel +</button>
+            <div class="fuel-stats">
+                <span class="avg-val" id="avg-dizel_plus">--</span>
+                <div class="details" id="desc-dizel_plus">Mat: --<br>I.H: 0.379<br>IVA: --</div>
+            </div>
+        </div>
+    </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="script.js"></script>
+    <div id="map"></div>
+
+    <div class="list-container" id="lista-eess">
+        <p style="text-align:center; font-size:0.8rem; color:#999;">Cargando datos...</p>
+    </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+    let map = L.map('map', { zoomControl: false, preferCanvas: true }).setView([40.41, -3.70], 6);
+    let markersLayer = L.layerGroup().addTo(map);
+    let datosCompletos = [];
+    let tipoActual = 'gas95';
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+    window.onload = () => {
+        cargarDatos();
+        setTimeout(() => map.invalidateSize(), 500);
+    };
+
+    async function cargarDatos() {
+        try {
+            const res = await fetch('https://sedeaplicaciones.minetur.gob.es/ServiciosRESTCarburantes/PreciosCarburantes/EstacionesTerrestres/');
+            const data = await res.json();
+            datosCompletos = data.ListaEESSPrecio.filter(e => e['Tipo Venta'] === 'P');
+            actualizarMediasEImpuestos();
+            dibujarTodo();
+        } catch (e) {
+            document.getElementById('lista-eess').innerHTML = "Error al conectar.";
+        }
+    }
+
+    function selectFuel(btn, id) {
+        document.querySelectorAll('.fuel-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        tipoActual = id;
+        dibujarTodo();
+    }
+
+    function actualizarMediasEImpuestos() {
+        const config = {
+            'gas95': { campo: 'Precio Gasolina 95 E5', ieh: 0.472 },
+            'dizel': { campo: 'Precio Gasoleo A', ieh: 0.379 },
+            'dizel_plus': { campo: 'Precio Gasoleo Premium', ieh: 0.379 }
+        };
+
+        Object.keys(config).forEach(id => {
+            const item = config[id];
+            let precios = datosCompletos.map(e => e[item.campo]).filter(p => p).map(p => parseFloat(p.replace(',', '.')));
+            if (precios.length) {
+                const media = precios.reduce((a, b) => a + b, 0) / precios.length;
+                const iva = media - (media / 1.21);
+                const materia = media - iva - item.ieh;
+                document.getElementById(`avg-${id}`).innerText = media.toFixed(3);
+                document.getElementById(`desc-${id}`).innerHTML = `Mat: ${materia.toFixed(3)}<br>I.H: ${item.ieh.toFixed(3)}<br>IVA: ${iva.toFixed(3)}`;
+            }
+        });
+    }
+
+    function dibujarTodo() {
+        markersLayer.clearLayers();
+        const listaDiv = document.getElementById('lista-eess');
+        listaDiv.innerHTML = "";
+
+        const bounds = map.getBounds();
+        const zoom = map.getZoom();
+        const campoPrecio = tipoActual === 'gas95' ? 'Precio Gasolina 95 E5' : (tipoActual === 'dizel' ? 'Precio Gasoleo A' : 'Precio Gasoleo Premium');
+
+        let visibles = datosCompletos.filter(e => {
+            if (!e[campoPrecio]) return false;
+            const lat = parseFloat(e.Latitud.replace(',', '.'));
+            const lon = parseFloat(e['Longitud (WGS84)'].replace(',', '.'));
+            return bounds.contains([lat, lon]);
+        });
+
+        if (visibles.length === 0) return;
+
+        const preciosLocal = visibles.map(e => parseFloat(e[campoPrecio].replace(',', '.')));
+        const minP = Math.min(...preciosLocal);
+        const maxP = Math.max(...preciosLocal);
+        const rango = maxP - minP;
+
+        visibles.sort((a, b) => parseFloat(a[campoPrecio].replace(',','.')) - parseFloat(b[campoPrecio].replace(',','.')));
+
+        visibles.forEach((e, i) => {
+            const p = parseFloat(e[campoPrecio].replace(',', '.'));
+            const lat = parseFloat(e.Latitud.replace(',', '.'));
+            const lon = parseFloat(e['Longitud (WGS84)'].replace(',', '.'));
+            
+            let colorHex = "#ffeb3b"; // Amarillo por defecto
+            let claseColor = "c-amarillo";
+
+            if (rango > 0) {
+                const perc = (p - minP) / rango;
+                if (perc < 0.25) { 
+                    colorHex = "#28a745"; // Verde
+                    claseColor = "c-verde"; 
+                } else if (perc > 0.75) { 
+                    colorHex = "#dc3545"; // Rojo
+                    claseColor = "c-rojo"; 
+                }
+                // Si el porcentaje está entre 0.25 y 0.75, se queda con los valores por defecto (amarillo)
+            } else {
+                colorHex = "#28a745"; // Si todas son iguales, todas verdes
+                claseColor = "c-verde";
+            }
+
+            // DIBUJAR EN EL MAPA
+            if (zoom < 10) {
+                L.circleMarker([lat, lon], {
+                    radius: 4,
+                    fillColor: colorHex,
+                    color: "#000",
+                    weight: 0.5,
+                    fillOpacity: 1
+                }).addTo(markersLayer);
+            } else {
+                L.marker([lat, lon], {
+                    icon: L.divIcon({
+                        className: 'custom-marker',
+                        html: `<span class="${claseColor}">${p.toFixed(3)}</span>`,
+                        iconSize: [46, 16]
+                    })
+                }).addTo(markersLayer);
+            }
+
+            // AÑADIR A LA LISTA (Top 100)
+            if (i < 100) {
+                const card = document.createElement('div');
+                card.className = 'gas-card';
+                card.style.borderLeftColor = colorHex;
+                card.innerHTML = `
+                    <div class="gas-info">
+                        <span class="gas-name">${e['Rótulo']}</span>
+                        <span class="gas-address">${e['Dirección']}</span>
+                    </div>
+                    <div class="gas-price ${claseColor}">${p.toFixed(3)}</div>
+                `;
+                card.onclick = () => map.setView([lat, lon], 15);
+                listaDiv.appendChild(card);
+            }
+        });
+    }
+
+    map.on('moveend', dibujarTodo);
+</script>
 </body>
 </html>

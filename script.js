@@ -1,3 +1,15 @@
+window.onload = function() {
+    cargarDatosIniciales();
+    
+    // El mapa necesita un pequeño retraso para detectar el tamaño real del div en móviles
+    setTimeout(() => { 
+        map.invalidateSize(); 
+    }, 400); 
+
+    window.addEventListener('resize', () => {
+        map.invalidateSize();
+    });
+};
 // Sustituir la función original calcularYMostrarMedias por esta:
 function calcularYMostrarMedias(estaciones) {
     const tipos = {
@@ -48,3 +60,8 @@ selectFuel = function(btn, id) {
     originalSelectFuel(btn, id);
     actualizarUIEstadisticas(id);
 };
+
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap'
+}).addTo(map);
