@@ -119,9 +119,15 @@ body {
 /* Ajustes Leaflet */
 .custom-gas-marker .marker-content {
     background: white;
-    border: 2px solid #333;
-    border-radius: 5px;
-    padding: 2px 5px;
-    font-size: 11px;
+    border: 1.5px solid #333; /* Borde oscuro fino */
+    border-radius: 5px;       /* Bordes redondeados */
     font-weight: bold;
+    font-size: 12px;          /* Un poco más grande para legibilidad */
+    text-align: center;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.3); /* Sombra para efecto flotante */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    padding: 2px 4px;
 }

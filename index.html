@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Gasolineras España - Colores Dinámicos</title>
+    <title>Precios Carburante</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
@@ -19,7 +19,7 @@
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
         }
         header { background: #222; color: white; padding: 12px; text-align: center; }
-        header h1 { margin: 0; font-size: 1rem; text-transform: uppercase; }
+        header h1 { margin: 0; font-size: 1.1rem; }
 
         .fuel-grid {
             display: grid; grid-template-columns: 1fr 1fr 1fr;
@@ -28,47 +28,50 @@
         .fuel-column { display: flex; flex-direction: column; align-items: center; }
         .fuel-btn {
             width: 100%; padding: 10px 2px; border: none; border-radius: 6px;
-            font-weight: bold; font-size: 0.7rem; color: white; opacity: 0.3;
-            transition: 0.2s; cursor: pointer; margin-bottom: 5px;
+            font-weight: bold; font-size: 0.7rem; color: white; opacity: 0.35;
+            transition: 0.2s; cursor: pointer; margin-bottom: 6px;
         }
-        .fuel-btn.active { opacity: 1; transform: scale(1.02); }
+        .fuel-btn.active { opacity: 1; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
         .btn-gas95 { background: #28a745; }
         .btn-dizel { background: #444; }
         .btn-dizel-plus { background: #dc3545; }
 
         .fuel-stats { text-align: center; width: 100%; }
-        .avg-val { display: block; font-size: 0.9rem; font-weight: 800; color: #222; }
-        .details { font-size: 0.55rem; color: #777; line-height: 1.2; border-top: 1px solid #f0f0f0; margin-top: 3px; padding-top: 3px; }
+        .avg-val { display: block; font-size: 0.95rem; font-weight: 800; color: #222; }
+        .details { font-size: 0.58rem; color: #666; line-height: 1.2; border-top: 1px solid #f0f0f0; padding-top: 4px; }
 
-        #map { width: 100%; height: 380px; background: #eee; }
+        .search-box { display: flex; padding: 10px; }
+        .search-box input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 6px 0 0 6px; font-size: 16px; }
+        .search-box button { padding: 0 12px; background: #222; color: white; border: none; border-radius: 0 6px 6px 0; }
 
-        .list-container { flex: 1; padding: 10px; overflow-y: auto; background: #fafafa; }
+        #map { width: 100%; height: 350px; background: #eee; }
+
+        .list-container { flex: 1; padding: 10px; overflow-y: auto; background: #fdfdfd; }
         .gas-card {
-            background: #333; color: white; padding: 10px; border-radius: 8px;
+            background: #333; color: white; padding: 12px; border-radius: 8px;
             margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;
-            border-left: 6px solid #ccc;
+            border-left: 5px solid transparent;
         }
-        .gas-info { flex: 1; overflow: hidden; }
-        .gas-name { font-weight: bold; font-size: 0.8rem; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .gas-address { font-size: 0.65rem; color: #bbb; }
+        .gas-info { flex: 1; }
+        .gas-name { font-weight: bold; font-size: 0.8rem; display: block; }
+        .gas-address { font-size: 0.65rem; color: #ccc; }
         .gas-price { font-weight: bold; font-size: 1.1rem; padding-left: 10px; }
 
-        /* Estilos de marcadores y colores */
+        .c-low { color: #5efc82; }     
+        .c-med { color: #ffeb3b; }     
+        .c-high { color: #ff5252; }    
+
         .custom-marker {
-            background: white; border: 1.5px solid #222; border-radius: 3px;
-            font-weight: bold; font-size: 10px; text-align: center; padding: 1px;
+            background: white; border: 1px solid #222; border-radius: 3px;
+            font-weight: bold; font-size: 10px; text-align: center;
+            line-height: 16px;
         }
-        
-        /* Clases de colores para la lista y el mapa */
-        .c-verde { color: #5efc82 !important; }   /* Barato */
-        .c-amarillo { color: #ffeb3b !important; } /* Intermedio */
-        .c-rojo { color: #ff5252 !important; }    /* Caro */
     </style>
 </head>
 <body>
 
 <div class="app-container">
-    <header><h1>⛽ Comparador Dinámico</h1></header>
+    <header><h1>⛽ Precios Carburante</h1></header>
 
     <div class="fuel-grid">
         <div class="fuel-column">
@@ -94,17 +97,27 @@
         </div>
     </div>
 
+    <div class="search-box">
+        <input type="text" id="input-loc" placeholder="Localidad..." />
+        <button onclick="buscarLocalidad()">🔍</button>
+    </div>
+
     <div id="map"></div>
 
     <div class="list-container" id="lista-eess">
-        <p style="text-align:center; font-size:0.8rem; color:#999;">Cargando datos...</p>
+        <p style="text-align:center; font-size:0.8rem; color:#999;">Cargando estaciones...</p>
     </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-    let map = L.map('map', { zoomControl: false, preferCanvas: true }).setView([40.41, -3.70], 6);
+    // Configuración inicial del mapa
+    let map = L.map('map', { 
+        zoomControl: false,
+        preferCanvas: true // CRÍTICO: Usa Canvas para poder dibujar miles de puntos sin lag
+    }).setView([40.41, -3.70], 6);
+    
     let markersLayer = L.layerGroup().addTo(map);
     let datosCompletos = [];
     let tipoActual = 'gas95';
@@ -121,10 +134,10 @@
             const res = await fetch('https://sedeaplicaciones.minetur.gob.es/ServiciosRESTCarburantes/PreciosCarburantes/EstacionesTerrestres/');
             const data = await res.json();
             datosCompletos = data.ListaEESSPrecio.filter(e => e['Tipo Venta'] === 'P');
-            actualizarMediasEImpuestos();
-            dibujarTodo();
+            actualizarTodasLasMedias();
+            dibujarElementos();
         } catch (e) {
-            document.getElementById('lista-eess').innerHTML = "Error al conectar.";
+            document.getElementById('lista-eess').innerHTML = "Error al cargar datos.";
         }
     }
 
@@ -132,38 +145,43 @@
         document.querySelectorAll('.fuel-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         tipoActual = id;
-        dibujarTodo();
+        dibujarElementos();
     }
 
-    function actualizarMediasEImpuestos() {
-        const config = {
+    function actualizarTodasLasMedias() {
+        const tipos = {
             'gas95': { campo: 'Precio Gasolina 95 E5', ieh: 0.472 },
             'dizel': { campo: 'Precio Gasoleo A', ieh: 0.379 },
             'dizel_plus': { campo: 'Precio Gasoleo Premium', ieh: 0.379 }
         };
 
-        Object.keys(config).forEach(id => {
-            const item = config[id];
-            let precios = datosCompletos.map(e => e[item.campo]).filter(p => p).map(p => parseFloat(p.replace(',', '.')));
+        Object.keys(tipos).forEach(id => {
+            const config = tipos[id];
+            let precios = datosCompletos
+                .map(e => e[config.campo])
+                .filter(p => p)
+                .map(p => parseFloat(p.replace(',', '.')));
+
             if (precios.length) {
                 const media = precios.reduce((a, b) => a + b, 0) / precios.length;
                 const iva = media - (media / 1.21);
-                const materia = media - iva - item.ieh;
+                const materia = media - iva - config.ieh;
                 document.getElementById(`avg-${id}`).innerText = media.toFixed(3);
-                document.getElementById(`desc-${id}`).innerHTML = `Mat: ${materia.toFixed(3)}<br>I.H: ${item.ieh.toFixed(3)}<br>IVA: ${iva.toFixed(3)}`;
+                document.getElementById(`desc-${id}`).innerHTML = `Mat: ${materia.toFixed(3)}<br>I.H: ${config.ieh.toFixed(3)}<br>IVA: ${iva.toFixed(3)}`;
             }
         });
     }
 
-    function dibujarTodo() {
+    function dibujarElementos() {
         markersLayer.clearLayers();
         const listaDiv = document.getElementById('lista-eess');
+        const zoomActual = map.getZoom();
         listaDiv.innerHTML = "";
 
         const bounds = map.getBounds();
-        const zoom = map.getZoom();
         const campoPrecio = tipoActual === 'gas95' ? 'Precio Gasolina 95 E5' : (tipoActual === 'dizel' ? 'Precio Gasoleo A' : 'Precio Gasoleo Premium');
 
+        // 1. Filtrar las que están en el área visible (SIN LÍMITE DE ZOOM)
         let visibles = datosCompletos.filter(e => {
             if (!e[campoPrecio]) return false;
             const lat = parseFloat(e.Latitud.replace(',', '.'));
@@ -171,59 +189,36 @@
             return bounds.contains([lat, lon]);
         });
 
-        if (visibles.length === 0) return;
+        if (visibles.length === 0) {
+            listaDiv.innerHTML = '<p style="text-align:center; font-size:0.8rem; color:#888;">No hay estaciones en esta zona</p>';
+            return;
+        }
 
-        const preciosLocal = visibles.map(e => parseFloat(e[campoPrecio].replace(',', '.')));
-        const minP = Math.min(...preciosLocal);
-        const maxP = Math.max(...preciosLocal);
+        // Calcular rango para colores
+        const preciosLista = visibles.map(e => parseFloat(e[campoPrecio].replace(',', '.')));
+        const minP = Math.min(...preciosLista);
+        const maxP = Math.max(...preciosLista);
         const rango = maxP - minP;
 
+        // Ordenar para la lista
         visibles.sort((a, b) => parseFloat(a[campoPrecio].replace(',','.')) - parseFloat(b[campoPrecio].replace(',','.')));
 
-        visibles.forEach((e, i) => {
+        visibles.forEach((e, index) => {
             const p = parseFloat(e[campoPrecio].replace(',', '.'));
             const lat = parseFloat(e.Latitud.replace(',', '.'));
             const lon = parseFloat(e['Longitud (WGS84)'].replace(',', '.'));
             
-            let colorHex = "#ffeb3b"; // Amarillo por defecto
-            let claseColor = "c-amarillo";
-
+            let colorHex = '#ffeb3b'; // Amarillo default
+            let claseColor = 'c-med';
+            
             if (rango > 0) {
-                const perc = (p - minP) / rango;
-                if (perc < 0.25) { 
-                    colorHex = "#28a745"; // Verde
-                    claseColor = "c-verde"; 
-                } else if (perc > 0.75) { 
-                    colorHex = "#dc3545"; // Rojo
-                    claseColor = "c-rojo"; 
-                }
-                // Si el porcentaje está entre 0.25 y 0.75, se queda con los valores por defecto (amarillo)
-            } else {
-                colorHex = "#28a745"; // Si todas son iguales, todas verdes
-                claseColor = "c-verde";
+                const porcentaje = (p - minP) / rango;
+                if (porcentaje < 0.25) { claseColor = 'c-low'; colorHex = '#28a745'; }
+                else if (porcentaje > 0.75) { claseColor = 'c-high'; colorHex = '#dc3545'; }
             }
 
-            // DIBUJAR EN EL MAPA
-            if (zoom < 10) {
-                L.circleMarker([lat, lon], {
-                    radius: 4,
-                    fillColor: colorHex,
-                    color: "#000",
-                    weight: 0.5,
-                    fillOpacity: 1
-                }).addTo(markersLayer);
-            } else {
-                L.marker([lat, lon], {
-                    icon: L.divIcon({
-                        className: 'custom-marker',
-                        html: `<span class="${claseColor}">${p.toFixed(3)}</span>`,
-                        iconSize: [46, 16]
-                    })
-                }).addTo(markersLayer);
-            }
-
-            // AÑADIR A LA LISTA (Top 100)
-            if (i < 100) {
+            // AÑADIR A LA LISTA (solo mostramos las 50 primeras en la lista para no colapsar el scroll)
+            if (index < 50) {
                 const card = document.createElement('div');
                 card.className = 'gas-card';
                 card.style.borderLeftColor = colorHex;
@@ -237,10 +232,50 @@
                 card.onclick = () => map.setView([lat, lon], 15);
                 listaDiv.appendChild(card);
             }
+
+            // AÑADIR AL MAPA
+            // Si el zoom es muy lejano, usamos círculos simples para rendimiento
+            if (zoomActual < 10) {
+                L.circleMarker([lat, lon], {
+                    radius: 4,
+                    fillColor: colorHex,
+                    color: "#000",
+                    weight: 0.5,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                }).addTo(markersLayer);
+            } else {
+                // Si el zoom es cercano, mostramos el precio
+                L.marker([lat, lon], {
+                    icon: L.divIcon({
+                        className: 'custom-marker',
+                        html: `<span class="${claseColor}">${p.toFixed(3)}</span>`,
+                        iconSize: [48, 16]
+                    })
+                }).addTo(markersLayer);
+            }
         });
+
+        if (visibles.length > 50) {
+            let info = document.createElement('p');
+            info.style.textAlign = 'center';
+            info.style.fontSize = '0.7rem';
+            info.style.color = '#999';
+            info.innerText = `Mostrando las 50 más baratas de ${visibles.length} encontradas.`;
+            listaDiv.appendChild(info);
+        }
     }
 
-    map.on('moveend', dibujarTodo);
+    function buscarLocalidad() {
+        const val = document.getElementById('input-loc').value.toLowerCase();
+        const found = datosCompletos.find(e => e.Municipio.toLowerCase().includes(val) || e.CP == val);
+        if (found) {
+            map.setView([parseFloat(found.Latitud.replace(',', '.')), parseFloat(found['Longitud (WGS84)'].replace(',', '.'))], 13);
+        }
+    }
+
+    // Actualizar cuando el usuario mueva el mapa o cambie el zoom
+    map.on('moveend', dibujarElementos);
 </script>
 </body>
 </html>
