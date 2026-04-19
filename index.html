@@ -107,7 +107,7 @@
 <body>
 
 <div class="app-container">
-    <header><h1>Gasolineras España</h1></header>
+    <header><h1>⛽ Precios Carburantes</h1></header>
 
     <div class="fuel-grid">
         <div class="fuel-column">
@@ -115,6 +115,7 @@
             <div class="avg-container"><span id="avg-gas95">--</span></div>
             <div class="details-box" id="desc-gas95">
                 <div class="details-line"><span>Mat:</span> <strong class="v">--</strong></div>
+                <div class="details-line"><span>I.H:</span> <strong class="v">0.472</strong></div>
                 <div class="details-line"><span>IVA:</span> <strong class="v">--</strong></div>
             </div>
         </div>
@@ -123,6 +124,7 @@
             <div class="avg-container"><span id="avg-dizel">--</span></div>
             <div class="details-box" id="desc-dizel">
                 <div class="details-line"><span>Mat:</span> <strong class="v">--</strong></div>
+                <div class="details-line"><span>I.H:</span> <strong class="v">0.379</strong></div>
                 <div class="details-line"><span>IVA:</span> <strong class="v">--</strong></div>
             </div>
         </div>
@@ -131,6 +133,7 @@
             <div class="avg-container"><span id="avg-dizel_plus">--</span></div>
             <div class="details-box" id="desc-dizel_plus">
                 <div class="details-line"><span>Mat:</span> <strong class="v">--</strong></div>
+                <div class="details-line"><span>I.H:</span> <strong class="v">0.379</strong></div>
                 <div class="details-line"><span>IVA:</span> <strong class="v">--</strong></div>
             </div>
         </div>
@@ -160,7 +163,26 @@
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-    function getLogoUrl(rotulo) { const r = rotulo.toLowerCase(); if (r.includes('repsol')) return 'repsol.jpg'; if (r.includes('cepsa')) return 'cepsa.jpg'; if (r.includes('campsa')) return 'campsa.png'; if (r.includes('galp')) return 'galp.jpg'; if (r.includes('moeve')) return 'moeve.jpeg'; if (r.includes('plenoil') || r.includes('plenergy')) return 'plenoil.png'; if (r.includes('q8')) return 'q8.png'; if (r.includes('petroprix')) return 'petroprix.jpg'; if (r.includes('ballenoil')) return 'ballenoil.png'; if (r.includes('bp')) return 'bp.jpg'; if (r.includes('bonarea')) return 'bonarea.jpg'; if (r.includes('shell')) return 'shell.png'; if (r.includes('gasexpress')) return 'gasexpress.jpeg'; return IMG_DEFAULT; }
+    function getLogoUrl(rotulo) { 
+        const r = rotulo.toLowerCase(); 
+        if (r.includes('repsol')) return 'repsol.jpg'; 
+        if (r.includes('cepsa')) return 'cepsa.jpg'; 
+        if (r.includes('campsa')) return 'campsa.png'; 
+        if (r.includes('galp')) return 'galp.jpg'; 
+        if (r.includes('moeve')) return 'moeve.jpeg'; 
+        if (r.includes('plenoil') || r.includes('plenergy')) return 'plenoil.png'; 
+        if (r.includes('q8')) return 'q8.png'; 
+        if (r.includes('petroprix')) return 'petroprix.jpg'; 
+        if (r.includes('ballenoil')) return 'ballenoil.png'; 
+        if (r.includes('bp')) return 'bp.jpg'; 
+        if (r.includes('bonarea')) return 'bonarea.jpg'; 
+        if (r.includes('shell')) return 'shell.png'; 
+        if (r.includes('gasexpress')) return 'gasexpress.jpeg'; 
+        if (r.includes('leclerc')) return 'leclerc.jpeg'; 
+        if (r.includes('alcampo')) return 'alcampo.jpg';
+        if (r.includes('carrefour')) return 'carrefour.jpg';  
+        return IMG_DEFAULT; 
+    }
 
     async function cargarDatos() {
         try {
@@ -188,13 +210,11 @@
         const campos = { 'gas95': 'Precio Gasolina 95 E5', 'dizel': 'Precio Gasoleo A', 'dizel_plus': 'Precio Gasoleo Premium' };
         const campo = campos[tipoActual];
 
-        // 1. Si el zoom es menor a 10, no mostramos logos ni lista detallada
         if (zoom < 10) {
             listaDiv.innerHTML = `<p style="text-align:center; padding:20px; color:#999;">Haz zoom en el mapa para ver los logos y el listado de precios.</p>`;
             return;
         }
 
-        // 2. Filtrar visibles
         let visibles = datosCompletos.filter(e => {
             if (!e[campo]) return false;
             const lat = parseFloat(e.Latitud.replace(',', '.'));
@@ -207,13 +227,12 @@
             return;
         }
 
-        // 3. Ordenar y preparar colores
         visibles.sort((a, b) => parseFloat(a[campo].replace(',','.')) - parseFloat(b[campo].replace(',','.')));
         const minP = parseFloat(visibles[0][campo].replace(',','.'));
         const maxP = parseFloat(visibles[visibles.length - 1][campo].replace(',','.'));
         const rango = maxP - minP;
 
-        listaDiv.innerHTML = ""; // Limpiar lista para rellenar
+        listaDiv.innerHTML = "";
 
         visibles.forEach((e) => {
             const p = parseFloat(e[campo].replace(',', '.'));
@@ -228,15 +247,14 @@
                 else if (perc > 0.75) clase = "c-rojo";
             }
 
-            // AÑADIR AL MAPA
+            // AÑADIR AL MAPA (Cambio de etiquetas aquí)
             const icon = L.icon({ iconUrl: logo, iconSize: [32, 32], iconAnchor: [16, 16], popupAnchor: [0, -16] });
             const popup = `<div class="popup-gas"><strong>${e['Rótulo']}</strong><hr>
                 95: ${e['Precio Gasolina 95 E5'] || '--'}€<br>
-                A: ${e['Precio Gasoleo A'] || '--'}€<br>
-                A+: ${e['Precio Gasoleo Premium'] || '--'}€</div>`;
+                Diesel: ${e['Precio Gasoleo A'] || '--'}€<br>
+                Diesel +: ${e['Precio Gasoleo Premium'] || '--'}€</div>`;
             L.marker([lat, lon], { icon }).addTo(markersLayer).bindPopup(popup);
 
-            // AÑADIR A LA LISTA (Todas las visibles en el mapa)
             const card = document.createElement('div');
             card.className = 'gas-card';
             card.innerHTML = `
@@ -252,17 +270,27 @@
     }
 
     function actualizarMedias() {
-        const config = { 'gas95': 'Precio Gasolina 95 E5', 'dizel': 'Precio Gasoleo A', 'dizel_plus': 'Precio Gasoleo Premium' };
+        const config = { 
+            'gas95': { campo: 'Precio Gasolina 95 E5', ieh: 0.472 }, 
+            'dizel': { campo: 'Precio Gasoleo A', ieh: 0.379 }, 
+            'dizel_plus': { campo: 'Precio Gasoleo Premium', ieh: 0.379 } 
+        };
+
         Object.keys(config).forEach(id => {
-            let ps = datosCompletos.map(e => e[config[id]]).filter(p => p).map(p => parseFloat(p.replace(',', '.')));
+            const conf = config[id];
+            let ps = datosCompletos.map(e => e[conf.campo]).filter(p => p).map(p => parseFloat(p.replace(',', '.')));
             if (ps.length) {
                 const media = ps.reduce((a, b) => a + b, 0) / ps.length;
                 document.getElementById(`avg-${id}`).innerText = media.toFixed(3) + " €/L";
+                
                 const iva = media - (media / 1.21);
-                const mat = media - iva - (id === 'gas95' ? 0.472 : 0.379);
+                const mat = media - iva - conf.ieh;
+                
                 const container = document.getElementById(`desc-${id}`);
-                container.querySelectorAll('.v')[0].innerText = mat.toFixed(3);
-                container.querySelectorAll('.v')[1].innerText = iva.toFixed(3);
+                const valores = container.querySelectorAll('.v');
+                valores[0].innerText = mat.toFixed(3); // Mat
+                valores[1].innerText = conf.ieh.toFixed(3); // I.H
+                valores[2].innerText = iva.toFixed(3); // IVA
             }
         });
     }
