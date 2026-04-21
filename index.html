@@ -89,16 +89,41 @@
         
         .gas-price { font-weight: bold; font-size: 1.1rem; margin-left: 10px; flex-shrink: 0; }
 
-        /* --- COLORES --- */
+        /* --- COLORES COMPARTIDOS --- */
         .c-verde { color: #5efc82 !important; }
         .c-amarillo { color: #ffeb3b !important; }
         .c-rojo { color: #ff5252 !important; }
 
-        /* --- POPUP --- */
-        .leaflet-marker-icon { 
-            border-radius: 50%; border: 2px solid white; 
-            box-shadow: 0 2px 6px rgba(0,0,0,0.4); background: white; 
+        /* --- MARCADO CUADRADO DINÁMICO --- */
+        .custom-marker {
+            background: white;
+            border: 2px solid #333;
+            border-radius: 4px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            overflow: hidden;
         }
+        .marker-logo {
+            width: 100%;
+            height: 24px;
+            object-fit: contain;
+            background: white;
+            padding-top: 2px;
+        }
+        .marker-price-box {
+            width: 100%;
+            background: #222;
+            font-size: 0.6rem;
+            font-weight: 800;
+            text-align: center;
+            padding: 2px 0;
+            letter-spacing: -0.2px;
+        }
+
+        .leaflet-marker-icon { background: none; border: none; box-shadow: none; }
         .popup-gas { font-size: 0.85rem; min-width: 150px; }
         .popup-gas hr { border: 0; border-top: 1px solid #eee; margin: 8px 0; }
     </style>
@@ -244,14 +269,26 @@
             const lon = parseFloat(e['Longitud (WGS84)'].replace(',', '.'));
             const logo = getLogoUrl(e['Rótulo']);
             
-            let clase = "c-amarillo";
+            let claseColor = "c-amarillo";
             if (rango > 0) {
                 const perc = (p - minP) / rango;
-                if (perc < 0.25) clase = "c-verde";
-                else if (perc > 0.75) clase = "c-rojo";
+                if (perc < 0.25) claseColor = "c-verde";
+                else if (perc > 0.75) claseColor = "c-rojo";
             }
 
-            const icon = L.icon({ iconUrl: logo, iconSize: [32, 32], iconAnchor: [16, 16], popupAnchor: [0, -16] });
+            // --- ICONO CUADRADO CON COLOR SINCRONIZADO ---
+            const icon = L.divIcon({
+                className: '',
+                html: `
+                    <div class="custom-marker">
+                        <img src="${logo}" class="marker-logo" onerror="this.src='${IMG_DEFAULT}'">
+                        <div class="marker-price-box ${claseColor}">${p.toFixed(3)}</div>
+                    </div>
+                `,
+                iconSize: [46, 48],
+                iconAnchor: [23, 24]
+            });
+
             const popup = `<div class="popup-gas"><strong>${e['Rótulo']}</strong><hr>
                 95: ${e['Precio Gasolina 95 E5'] || '--'}€<br>
                 Diesel: ${e['Precio Gasoleo A'] || '--'}€<br>
@@ -266,7 +303,7 @@
                     <span class="gas-name">${e['Rótulo']}</span>
                     <span class="gas-address">${e['Dirección']}, ${e['Municipio']}</span>
                 </div>
-                <div class="gas-price ${clase}">${p.toFixed(3)}</div>`;
+                <div class="gas-price ${claseColor}">${p.toFixed(3)}</div>`;
             card.onclick = () => map.setView([lat, lon], 16);
             listaDiv.appendChild(card);
         });
@@ -302,7 +339,6 @@
         const busqueda = document.getElementById('input-busqueda').value.trim().toLowerCase();
         if (!busqueda) return;
 
-        // 1. Intentar coincidencia exacta en datos locales (Municipio o CP)
         const coincidenciaExacta = datosCompletos.find(x => 
             x.Municipio.toLowerCase() === busqueda || x.CP === busqueda
         );
@@ -313,7 +349,6 @@
                 parseFloat(coincidenciaExacta['Longitud (WGS84)'].replace(',', '.'))
             ], 13);
         } else {
-            // 2. Usar Nominatim (OpenStreetMap) para buscar cualquier lugar real
             try {
                 const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${busqueda}, Spain`);
                 const data = await response.json();
@@ -322,7 +357,6 @@
                     const { lat, lon } = data[0];
                     map.setView([lat, lon], 13);
                 } else {
-                    // 3. Fallback: búsqueda parcial
                     const parcial = datosCompletos.find(x => x.Municipio.toLowerCase().includes(busqueda));
                     if (parcial) {
                         map.setView([
