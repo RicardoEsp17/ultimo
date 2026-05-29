@@ -1,133 +1,484 @@
-body, html {
-    margin: 0; padding: 0;
-    width: 100%; height: 100%;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background-color: #f5f5f5;
-    overflow-x: hidden;
+:root {
+  --bg: #e7edf5;
+  --panel: #ffffff;
+  --ink: #0f172a;
+  --muted: #64748b;
+  --line: #d7e1ec;
+  --raw: #3ba3e6;
+  --tax: #dc2626;
+  --profit: #2fa84f;
+  --gas95: #2fad49;
+  --diesel: #3f3f3f;
+  --diesel-plus: #e42d43;
 }
 
-/* Forzamos aspecto móvil */
+* {
+  box-sizing: border-box;
+}
+
+html,
 body {
-    max-width: 480px;
-    margin: 0 auto;
-    background: white;
-    box-shadow: 0 0 20px rgba(0,0,0,0.1);
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
 }
 
-.mobile-header {
-    text-align: center;
-    padding: 10px;
-    background: #333;
-    color: white;
-}
-.mobile-header h1 { font-size: 1.2rem; margin: 0; }
-
-/* Tabs de combustible */
-.fuel-tabs {
-    display: flex;
-    justify-content: space-around;
-    padding: 10px;
-    gap: 5px;
-    background: #eee;
-}
-.fuel-btn {
-    flex: 1;
-    padding: 12px 5px;
-    border: none;
-    border-radius: 8px;
-    font-weight: bold;
-    font-size: 0.8rem;
-    color: white;
-    opacity: 0.5;
-    transition: 0.3s;
-}
-.fuel-btn.active { opacity: 1; transform: scale(1.05); }
-
-.btn-gas95 { background: #28a745; }
-.btn-dizel { background: #444; }
-.btn-dizel-plus { background: #dc3545; }
-
-/* Contenedor de Precios Medios */
-.stats-container {
-    padding: 10px;
-    text-align: center;
-    background: #fff;
-    border-bottom: 1px solid #ddd;
-}
-.stat-main { font-size: 1.1rem; }
-.stat-main strong { font-size: 1.4rem; display: block; color: #333; }
-.mini-breakdown { font-size: 0.75rem; color: #777; margin-top: 5px; }
-
-/* Secciones principales */
-.main-content { padding: 10px; }
-
-.search-container {
-    display: flex;
-    margin-bottom: 10px;
-}
-.search-container input {
-    flex: 1;
-    padding: 12px;
-    border: 1px solid #ccc;
-    border-radius: 8px 0 0 8px;
-}
-.search-container button {
-    padding: 0 15px;
-    background: #333;
-    color: white;
-    border: none;
-    border-radius: 0 8px 8px 0;
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Segoe UI Variable", "Segoe UI", Roboto, Arial, sans-serif;
+  overflow-x: hidden;
 }
 
-/* Asegúrate de que el contenedor padre tenga altura */
-.map-section {
-    height: 400px; /* Prueba con un valor fijo primero */
-    width: 100%;
-    position: relative;
+button,
+input {
+  font: inherit;
+}
+
+.app-shell {
+  width: 100%;
+  min-height: 100vh;
+  padding: 18px;
+  display: grid;
+  gap: 18px;
+}
+
+.app-header,
+.fuel-grid,
+.map-panel,
+.side-panel,
+.chart-panel {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 18px;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.1);
+}
+
+.app-header {
+  min-height: 84px;
+  padding: 20px 24px;
+  background: linear-gradient(135deg, #1f2937 0%, #0f172a 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.title-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #bfdbfe;
+  flex: 0 0 42px;
+}
+
+.title-icon svg {
+  width: 25px;
+  height: 25px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.4rem;
+  letter-spacing: 0;
+}
+
+.reload-button,
+.search-box button {
+  border: 0;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.reload-button {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+.fuel-grid {
+  padding: 20px;
+  background: var(--panel);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.fuel-card {
+  min-width: 0;
+  padding: 16px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  display: grid;
+  gap: 14px;
+}
+
+.fuel-button {
+  width: 100%;
+  max-width: 176px;
+  justify-self: center;
+  padding: 14px 18px;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 800;
+  text-align: center;
+  white-space: nowrap;
+  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.1);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, filter 0.16s ease;
+}
+
+.fuel-button:hover {
+  transform: translateY(-1px);
+}
+
+.fuel-button.active {
+  border-color: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 16px 30px rgba(15, 23, 42, 0.28), 0 0 0 4px rgba(37, 99, 235, 0.22);
+  transform: translateY(-2px) scale(1.05);
+  filter: saturate(1.18) brightness(1.08);
+}
+
+.btn-gas95 { background: var(--gas95); }
+.btn-diesel { background: var(--diesel); }
+.btn-diesel-plus { background: var(--diesel-plus); }
+
+.fuel-summary {
+  font-size: 0.98rem;
+  line-height: 1.35;
+}
+
+.fuel-summary strong {
+  font-size: 1.8rem;
+  font-weight: 800;
+}
+
+.fuel-summary span {
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.fuel-bar {
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+  display: flex;
+}
+
+.fuel-bar span { height: 100%; }
+.fuel-bar .raw { background: var(--raw); }
+.fuel-bar .tax { background: var(--tax); }
+.fuel-bar .profit { background: var(--profit); }
+
+.fuel-breakdown {
+  border: 1px solid var(--line);
+  background: #f8fbff;
+  border-radius: 14px;
+  padding: 12px 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.breakdown-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  color: #334155;
+  font-size: 0.92rem;
+}
+
+.breakdown-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: 0 0 10px;
+}
+
+.dot.raw { background: var(--raw); }
+.dot.tax { background: var(--tax); }
+.dot.profit { background: var(--profit); }
+
+.breakdown-value {
+  color: var(--ink);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.breakdown-pct {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.main-grid {
+  display: grid;
+  grid-template-columns: minmax(760px, 1.6fr) minmax(360px, 0.9fr);
+  gap: 18px;
+  height: 560px;
+  min-height: 560px;
+}
+
+.map-panel,
+.side-panel,
+.chart-panel {
+  background: var(--panel);
+  overflow: hidden;
 }
 
 #map {
-    height: 100%;
-    width: 100%;
-    z-index: 1; /* Evita que otros elementos lo tapen */
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background: #dbe4ef;
 }
 
-/* Lista de Gasolineras */
-#sidebar-lista {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+.side-panel {
+  display: flex;
+  flex-direction: column;
+  height: 560px;
+  min-height: 0;
 }
-.gas-item {
-    background: #333;
-    color: white;
-    padding: 15px;
-    border-radius: 12px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-.gas-name { font-weight: bold; font-size: 0.9rem; }
-.gas-address { font-size: 0.75rem; color: #bbb; display: block; }
-.gas-price { font-size: 1.1rem; font-weight: bold; }
 
-/* Colores de precios */
+.search-box {
+  padding: 16px;
+  display: flex;
+  gap: 10px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.search-box input {
+  min-width: 0;
+  flex: 1;
+  padding: 13px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.search-box button {
+  min-width: 96px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: #0f172a;
+  color: white;
+}
+
+.station-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 488px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 14px;
+  background: #f8fafc;
+}
+
+.station-card {
+  background: #2f3744;
+  color: white;
+  padding: 12px;
+  border-radius: 12px;
+  margin-bottom: 10px;
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  cursor: pointer;
+  border-left: 6px solid #94a3b8;
+}
+
+.station-logo {
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
+  object-fit: contain;
+  background: white;
+  padding: 4px;
+}
+
+.station-name {
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.station-address {
+  margin-top: 4px;
+  color: #cbd5e1;
+  font-size: 0.78rem;
+}
+
+.station-price {
+  font-weight: 800;
+  font-size: 1.15rem;
+}
+
 .price-low { color: #5efc82; }
-.price-medium { color: #ffeb3b; }
+.price-mid { color: #ffeb3b; }
 .price-high { color: #ff5252; }
 
-/* Ajustes Leaflet */
-.custom-gas-marker .marker-content {
-    background: white;
-    border: 1.5px solid #333; /* Borde oscuro fino */
-    border-radius: 5px;       /* Bordes redondeados */
-    font-weight: bold;
-    font-size: 12px;          /* Un poco más grande para legibilidad */
-    text-align: center;
-    box-shadow: 2px 2px 5px rgba(0,0,0,0.3); /* Sombra para efecto flotante */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    white-space: nowrap;
-    padding: 2px 4px;
+.custom-marker {
+  background: #fff;
+  border: 2px solid #333;
+  border-radius: 5px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+}
+
+.marker-logo {
+  width: 100%;
+  height: 24px;
+  object-fit: contain;
+  background: #fff;
+  padding: 2px;
+  display: block;
+}
+
+.marker-price {
+  width: 100%;
+  background: #222;
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-align: center;
+  padding: 2px 0;
+}
+
+.popup-gas { min-width: 240px; color: var(--ink); }
+.popup-head { padding: 14px 16px 12px; border-bottom: 1px solid #e2e8f0; background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); }
+.popup-title-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.popup-brand { font-weight: 800; }
+.route-button { padding: 8px 10px; border-radius: 10px; background: #eff6ff; border: 1px solid #dbeafe; color: #1d4ed8; text-decoration: none; font-size: 0.75rem; font-weight: 800; white-space: nowrap; }
+.popup-sub { margin-top: 4px; color: var(--muted); font-size: 0.74rem; }
+.popup-prices { padding: 14px 16px 16px; display: grid; gap: 10px; }
+.popup-row { display: flex; justify-content: space-between; gap: 16px; }
+.popup-value { font-weight: 800; }
+
+.chart-panel {
+  padding: 18px;
+  display: grid;
+  grid-template-rows: auto minmax(360px, 1fr);
+  gap: 14px;
+}
+
+.chart-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.chart-head h2 { margin: 0; font-size: 1.02rem; }
+.chart-head p { margin: 4px 0 0; color: var(--muted); font-size: 0.82rem; }
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #334155;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.legend i {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.chart-plot {
+  position: relative;
+  min-height: 380px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  overflow: hidden;
+}
+
+#historyChart {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.chart-tooltip {
+  position: absolute;
+  min-width: 170px;
+  max-width: 230px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.95);
+  color: #f8fafc;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.32);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  z-index: 5;
+}
+
+.chart-tooltip.visible { opacity: 1; }
+.tooltip-date { font-size: 0.82rem; font-weight: 800; margin-bottom: 8px; }
+.tooltip-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; margin-top: 5px; font-size: 0.78rem; }
+.tooltip-label { display: inline-flex; align-items: center; gap: 8px; }
+.tooltip-dot { width: 8px; height: 8px; border-radius: 50%; }
+.tooltip-value { font-weight: 800; white-space: nowrap; }
+
+.empty-message {
+  padding: 20px;
+  color: #64748b;
+  text-align: center;
+}
+
+@media (max-width: 1120px) {
+  .fuel-grid,
+  .main-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .main-grid {
+    height: auto;
+  }
+
+  #map,
+  .side-panel {
+    height: 440px;
+    min-height: 0;
+  }
+
+  .station-list {
+    height: 368px;
+  }
 }

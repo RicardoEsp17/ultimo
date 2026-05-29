@@ -1,380 +1,84 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Gasolineras España - Lista Sincronizada</title>
-    
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    
-    <style>
-        /* --- ESTILOS GENERALES --- */
-        html, body { 
-            margin: 0; padding: 0; width: 100%; height: 100%; 
-            font-family: 'Segoe UI', Roboto, Arial, sans-serif; 
-            background-color: #f0f0f0; overflow: hidden; 
-        }
-        
-        .app-container { 
-            width: 100%; max-width: 480px; margin: 0 auto; 
-            background: white; height: 100vh; display: flex; flex-direction: column; 
-            box-shadow: 0 0 20px rgba(0,0,0,0.2); 
-        }
-
-        header { background: #222; color: white; padding: 12px; text-align: center; flex-shrink: 0; }
-        header h1 { margin: 0; font-size: 1rem; letter-spacing: 1px; text-transform: uppercase; }
-
-        /* --- PRECIOS MEDIOS --- */
-        .fuel-grid { 
-            display: grid; grid-template-columns: 1fr 1fr 1fr; 
-            gap: 8px; padding: 10px; background: #fff; 
-            border-bottom: 1px solid #eee; flex-shrink: 0; 
-        }
-        .fuel-column { display: flex; flex-direction: column; align-items: center; }
-        
-        .fuel-btn { 
-            width: 100%; padding: 10px 2px; border: none; border-radius: 6px; 
-            font-weight: bold; font-size: 0.75rem; color: white; opacity: 0.3; 
-            cursor: pointer; margin-bottom: 5px; transition: 0.3s;
-        }
-        .fuel-btn.active { opacity: 1; transform: scale(1.02); }
-        .btn-gas95 { background: #28a745; }
-        .btn-dizel { background: #444; }
-        .btn-dizel-plus { background: #dc3545; }
-
-        .avg-container { font-size: 0.8rem; font-weight: 800; color: #222; margin-bottom: 5px; }
-
-        .details-box { 
-            width: 100%; background: #f9f9f9; border: 1px solid #ddd; 
-            border-radius: 5px; padding: 5px; font-size: 0.6rem; 
-            color: #555; line-height: 1.4; box-sizing: border-box; 
-        }
-        .details-line { display: flex; justify-content: space-between; border-bottom: 1px solid #eee; }
-        .details-line:last-child { border-bottom: none; }
-
-        /* --- MAPA Y BUSCADOR --- */
-        #map { width: 100%; height: 35vh; background: #eee; flex-shrink: 0; z-index: 1; }
-
-        .search-container { 
-            padding: 10px; background: #fff; border-bottom: 1px solid #ddd; 
-            display: flex; gap: 5px; flex-shrink: 0; 
-        }
-        .search-container input { 
-            flex: 1; padding: 10px; border: 1px solid #ccc; 
-            border-radius: 4px; font-size: 14px; 
-        }
-        .search-container button { 
-            padding: 10px 15px; background: #222; color: white; 
-            border: none; border-radius: 4px; cursor: pointer; 
-        }
-
-        /* --- LISTA --- */
-        .list-container { flex-grow: 1; overflow-y: auto; padding: 10px; background: #fafafa; }
-        
-        .gas-card { 
-            background: #333; color: white; padding: 12px; border-radius: 8px; 
-            margin-bottom: 10px; display: flex; align-items: center; 
-            border-left: 6px solid #ccc; cursor: pointer; transition: 0.2s;
-        }
-
-        .logo-lista { 
-            width: 45px; height: 45px; border-radius: 6px; 
-            object-fit: cover; margin-right: 12px; background: white; 
-            flex-shrink: 0;
-        }
-        
-        .gas-info { flex: 1; overflow: hidden; }
-        .gas-name { font-weight: bold; font-size: 0.85rem; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .gas-address { font-size: 0.65rem; color: #bbb; display: block; }
-        
-        .gas-price { font-weight: bold; font-size: 1.1rem; margin-left: 10px; flex-shrink: 0; }
-
-        /* --- COLORES COMPARTIDOS --- */
-        .c-verde { color: #5efc82 !important; }
-        .c-amarillo { color: #ffeb3b !important; }
-        .c-rojo { color: #ff5252 !important; }
-
-        /* --- MARCADO CUADRADO DINÁMICO --- */
-        .custom-marker {
-            background: white;
-            border: 2px solid #333;
-            border-radius: 4px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-            overflow: hidden;
-        }
-        .marker-logo {
-            width: 100%;
-            height: 24px;
-            object-fit: contain;
-            background: white;
-            padding-top: 2px;
-        }
-        .marker-price-box {
-            width: 100%;
-            background: #222;
-            font-size: 0.6rem;
-            font-weight: 800;
-            text-align: center;
-            padding: 2px 0;
-            letter-spacing: -0.2px;
-        }
-
-        .leaflet-marker-icon { background: none; border: none; box-shadow: none; }
-        .popup-gas { font-size: 0.85rem; min-width: 150px; }
-        .popup-gas hr { border: 0; border-top: 1px solid #eee; margin: 8px 0; }
-    </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gasolineras Espana</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="title-wrap">
+        <span class="title-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M7 3.5h6.2c1.4 0 2.5 1.1 2.5 2.5v12.4c0 1.2-1 2.1-2.1 2.1H6.4c-1.2 0-2.1-1-2.1-2.1V6c0-1.4 1.1-2.5 2.5-2.5Z" stroke="currentColor" stroke-width="1.7"/>
+            <path d="M7.1 7.2h5.9M9 10.3h2.4M15.7 8.6h1.3c1.4 0 2.5 1.1 2.5 2.5v3.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+            <path d="M18.4 20.5a1.4 1.4 0 1 0 0-2.8 1.4 1.4 0 0 0 0 2.8Z" fill="currentColor"/>
+          </svg>
+        </span>
+        <h1>Precios carburantes en Espana</h1>
+      </div>
+      <button class="reload-button" id="reloadButton" type="button">Recargar</button>
+    </header>
 
-<div class="app-container">
-    <header><h1>⛽ Precios Carburantes</h1></header>
+    <section class="fuel-grid" aria-label="Precios medios nacionales">
+      <article class="fuel-card">
+        <button class="fuel-button btn-gas95 active" type="button" data-fuel="gas95">Gas 95</button>
+        <div class="fuel-summary">Precio medio nacional: <strong id="avg-gas95">--</strong> <span>€/L</span></div>
+        <div class="fuel-bar" id="bar-gas95"></div>
+        <div class="fuel-breakdown" id="breakdown-gas95"></div>
+      </article>
+      <article class="fuel-card">
+        <button class="fuel-button btn-diesel" type="button" data-fuel="diesel">Diesel</button>
+        <div class="fuel-summary">Precio medio nacional: <strong id="avg-diesel">--</strong> <span>€/L</span></div>
+        <div class="fuel-bar" id="bar-diesel"></div>
+        <div class="fuel-breakdown" id="breakdown-diesel"></div>
+      </article>
+      <article class="fuel-card">
+        <button class="fuel-button btn-diesel-plus" type="button" data-fuel="dieselPlus">Diesel +</button>
+        <div class="fuel-summary">Precio medio nacional: <strong id="avg-dieselPlus">--</strong> <span>€/L</span></div>
+        <div class="fuel-bar" id="bar-dieselPlus"></div>
+        <div class="fuel-breakdown" id="breakdown-dieselPlus"></div>
+      </article>
+    </section>
 
-    <div class="fuel-grid">
-        <div class="fuel-column">
-            <button id="btn-gas95" class="fuel-btn btn-gas95 active" onclick="selectFuel(this, 'gas95')">Gas 95</button>
-            <div class="avg-container"><span id="avg-gas95">--</span></div>
-            <div class="details-box" id="desc-gas95">
-                <div class="details-line"><span>Mat:</span> <strong class="v">--</strong></div>
-                <div class="details-line"><span>I.H:</span> <strong class="v">0.472</strong></div>
-                <div class="details-line"><span>IVA:</span> <strong class="v">--</strong></div>
-            </div>
+    <main class="main-grid">
+      <section class="map-panel">
+        <div id="map"></div>
+      </section>
+
+      <aside class="side-panel">
+        <form class="search-box" id="searchForm">
+          <input id="searchInput" type="search" placeholder="Buscar ciudad, calle o codigo postal" autocomplete="off">
+          <button type="submit">Buscar</button>
+        </form>
+        <div class="station-list" id="stationList"></div>
+      </aside>
+    </main>
+
+    <section class="chart-panel">
+      <div class="chart-head">
+        <div>
+          <h2>Evolucion de 30 dias</h2>
+          <p id="chartSubtitle">Eje izquierdo en €/L y eje derecho en $ por barril</p>
         </div>
-        <div class="fuel-column">
-            <button id="btn-dizel" class="fuel-btn btn-dizel" onclick="selectFuel(this, 'dizel')">Diésel</button>
-            <div class="avg-container"><span id="avg-dizel">--</span></div>
-            <div class="details-box" id="desc-dizel">
-                <div class="details-line"><span>Mat:</span> <strong class="v">--</strong></div>
-                <div class="details-line"><span>I.H:</span> <strong class="v">0.379</strong></div>
-                <div class="details-line"><span>IVA:</span> <strong class="v">--</strong></div>
-            </div>
+        <div class="legend">
+          <span><i style="background:#334155"></i>Brent</span>
+          <span><i style="background:#16a34a"></i>Gas 95</span>
+          <span><i style="background:#f59e0b"></i>Diesel</span>
+          <span><i style="background:#dc2626"></i>Diesel +</span>
         </div>
-        <div class="fuel-column">
-            <button id="btn-dizel-plus" class="fuel-btn btn-dizel-plus" onclick="selectFuel(this, 'dizel_plus')">Diésel +</button>
-            <div class="avg-container"><span id="avg-dizel_plus">--</span></div>
-            <div class="details-box" id="desc-dizel_plus">
-                <div class="details-line"><span>Mat:</span> <strong class="v">--</strong></div>
-                <div class="details-line"><span>I.H:</span> <strong class="v">0.379</strong></div>
-                <div class="details-line"><span>IVA:</span> <strong class="v">--</strong></div>
-            </div>
-        </div>
-    </div>
+      </div>
+      <div class="chart-plot" id="chartPlot">
+        <svg id="historyChart" aria-label="Historico de precios"></svg>
+        <div class="chart-tooltip" id="chartTooltip"></div>
+      </div>
+    </section>
+  </div>
 
-    <div id="map"></div>
-
-    <div class="search-container">
-        <input type="text" id="input-busqueda" placeholder="Ciudad, calle o CP..." onkeypress="if(event.key==='Enter') buscarLocalidad()">
-        <button onclick="buscarLocalidad()">🔍</button>
-    </div>
-
-    <div class="list-container" id="lista-eess">
-        <p style="text-align:center; padding:20px; color:#999;">Acércate al mapa para ver la lista.</p>
-    </div>
-</div>
-
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-<script>
-    let map = L.map('map', { zoomControl: false }).setView([40.41, -3.70], 6);
-    let markersLayer = L.layerGroup().addTo(map);
-    let datosCompletos = [];
-    let tipoActual = 'gas95';
-    
-    const IMG_DEFAULT = 'default.jpg'; 
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-
-    function getLogoUrl(rotulo) { 
-        const r = rotulo.toLowerCase(); 
-        if (r.includes('repsol')) return 'repsol.jpg'; 
-        if (r.includes('cepsa')) return 'cepsa.jpg'; 
-        if (r.includes('campsa')) return 'campsa.png'; 
-        if (r.includes('galp')) return 'galp.jpg'; 
-        if (r.includes('moeve')) return 'moeve.jpeg'; 
-        if (r.includes('plenoil') || r.includes('plenergy')) return 'plenoil.png'; 
-        if (r.includes('q8')) return 'q8.png'; 
-        if (r.includes('petroprix')) return 'petroprix.jpg'; 
-        if (r.includes('ballenoil')) return 'ballenoil.png'; 
-        if (r.includes('bp')) return 'bp.jpg'; 
-        if (r.includes('bonarea')) return 'bonarea.jpg'; 
-        if (r.includes('shell')) return 'shell.png'; 
-        if (r.includes('gasexpress')) return 'gasexpress.jpeg'; 
-        if (r.includes('leclerc')) return 'leclerc.jpeg'; 
-        if (r.includes('alcampo')) return 'alcampo.jpg';
-        if (r.includes('carrefour')) return 'carrefour.jpg';  
-        if (r.includes('petronor')) return 'petronor.jpg'; 
-        if (r.includes('disa')) return 'disa.jpeg';
-        if (r.includes('tgas')) return 'tgas.jpg';
-        if (r.includes('océano')) return 'oceano.png';
-        if (r.includes('canary')) return 'canaryoil.png'; 
-        return IMG_DEFAULT; 
-    }
-
-    async function cargarDatos() {
-        try {
-            const res = await fetch('https://sedeaplicaciones.minetur.gob.es/ServiciosRESTCarburantes/PreciosCarburantes/EstacionesTerrestres/');
-            const data = await res.json();
-            datosCompletos = data.ListaEESSPrecio.filter(e => e['Tipo Venta'] === 'P');
-            actualizarMedias();
-            dibujarTodo();
-        } catch (e) { console.error(e); }
-    }
-
-    function selectFuel(btn, id) {
-        document.querySelectorAll('.fuel-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        tipoActual = id;
-        dibujarTodo();
-    }
-
-    function dibujarTodo() {
-        markersLayer.clearLayers();
-        const listaDiv = document.getElementById('lista-eess');
-        const bounds = map.getBounds();
-        const zoom = map.getZoom();
-        
-        const campos = { 'gas95': 'Precio Gasolina 95 E5', 'dizel': 'Precio Gasoleo A', 'dizel_plus': 'Precio Gasoleo Premium' };
-        const campo = campos[tipoActual];
-
-        if (zoom < 10) {
-            listaDiv.innerHTML = `<p style="text-align:center; padding:20px; color:#999;">Haz zoom en el mapa para ver los logos y el listado de precios.</p>`;
-            return;
-        }
-
-        let visibles = datosCompletos.filter(e => {
-            if (!e[campo]) return false;
-            const lat = parseFloat(e.Latitud.replace(',', '.'));
-            const lon = parseFloat(e['Longitud (WGS84)'].replace(',', '.'));
-            return bounds.contains([lat, lon]);
-        });
-
-        if (visibles.length === 0) {
-            listaDiv.innerHTML = `<p style="text-align:center; padding:20px; color:#999;">No hay gasolineras en esta zona.</p>`;
-            return;
-        }
-
-        visibles.sort((a, b) => parseFloat(a[campo].replace(',','.')) - parseFloat(b[campo].replace(',','.')));
-        const minP = parseFloat(visibles[0][campo].replace(',','.'));
-        const maxP = parseFloat(visibles[visibles.length - 1][campo].replace(',','.'));
-        const rango = maxP - minP;
-
-        listaDiv.innerHTML = "";
-
-        visibles.forEach((e) => {
-            const p = parseFloat(e[campo].replace(',', '.'));
-            const lat = parseFloat(e.Latitud.replace(',', '.'));
-            const lon = parseFloat(e['Longitud (WGS84)'].replace(',', '.'));
-            const logo = getLogoUrl(e['Rótulo']);
-            
-            let claseColor = "c-amarillo";
-            if (rango > 0) {
-                const perc = (p - minP) / rango;
-                if (perc < 0.25) claseColor = "c-verde";
-                else if (perc > 0.75) claseColor = "c-rojo";
-            }
-
-            // --- ICONO CUADRADO CON COLOR SINCRONIZADO ---
-            const icon = L.divIcon({
-                className: '',
-                html: `
-                    <div class="custom-marker">
-                        <img src="${logo}" class="marker-logo" onerror="this.src='${IMG_DEFAULT}'">
-                        <div class="marker-price-box ${claseColor}">${p.toFixed(3)}</div>
-                    </div>
-                `,
-                iconSize: [46, 48],
-                iconAnchor: [23, 24]
-            });
-
-            const popup = `<div class="popup-gas"><strong>${e['Rótulo']}</strong><hr>
-                95: ${e['Precio Gasolina 95 E5'] || '--'}€<br>
-                Diesel: ${e['Precio Gasoleo A'] || '--'}€<br>
-                Diesel +: ${e['Precio Gasoleo Premium'] || '--'}€</div>`;
-            L.marker([lat, lon], { icon }).addTo(markersLayer).bindPopup(popup);
-
-            const card = document.createElement('div');
-            card.className = 'gas-card';
-            card.innerHTML = `
-                <img src="${logo}" class="logo-lista" onerror="this.src='${IMG_DEFAULT}'">
-                <div class="gas-info">
-                    <span class="gas-name">${e['Rótulo']}</span>
-                    <span class="gas-address">${e['Dirección']}, ${e['Municipio']}</span>
-                </div>
-                <div class="gas-price ${claseColor}">${p.toFixed(3)}</div>`;
-            card.onclick = () => map.setView([lat, lon], 16);
-            listaDiv.appendChild(card);
-        });
-    }
-
-    function actualizarMedias() {
-        const config = { 
-            'gas95': { campo: 'Precio Gasolina 95 E5', ieh: 0.472 }, 
-            'dizel': { campo: 'Precio Gasoleo A', ieh: 0.379 }, 
-            'dizel_plus': { campo: 'Precio Gasoleo Premium', ieh: 0.379 } 
-        };
-
-        Object.keys(config).forEach(id => {
-            const conf = config[id];
-            let ps = datosCompletos.map(e => e[conf.campo]).filter(p => p).map(p => parseFloat(p.replace(',', '.')));
-            if (ps.length) {
-                const media = ps.reduce((a, b) => a + b, 0) / ps.length;
-                document.getElementById(`avg-${id}`).innerText = media.toFixed(3) + " €/L";
-                
-                const iva = media - (media / 1.21);
-                const mat = media - iva - conf.ieh;
-                
-                const container = document.getElementById(`desc-${id}`);
-                const valores = container.querySelectorAll('.v');
-                valores[0].innerText = mat.toFixed(3); // Mat
-                valores[1].innerText = conf.ieh.toFixed(3); // I.H
-                valores[2].innerText = iva.toFixed(3); // IVA
-            }
-        });
-    }
-
-    async function buscarLocalidad() {
-        const busqueda = document.getElementById('input-busqueda').value.trim().toLowerCase();
-        if (!busqueda) return;
-
-        const coincidenciaExacta = datosCompletos.find(x => 
-            x.Municipio.toLowerCase() === busqueda || x.CP === busqueda
-        );
-
-        if (coincidenciaExacta) {
-            map.setView([
-                parseFloat(coincidenciaExacta.Latitud.replace(',', '.')), 
-                parseFloat(coincidenciaExacta['Longitud (WGS84)'].replace(',', '.'))
-            ], 13);
-        } else {
-            try {
-                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${busqueda}, Spain`);
-                const data = await response.json();
-                
-                if (data && data.length > 0) {
-                    const { lat, lon } = data[0];
-                    map.setView([lat, lon], 13);
-                } else {
-                    const parcial = datosCompletos.find(x => x.Municipio.toLowerCase().includes(busqueda));
-                    if (parcial) {
-                        map.setView([
-                            parseFloat(parcial.Latitud.replace(',', '.')), 
-                            parseFloat(parcial['Longitud (WGS84)'].replace(',', '.'))
-                        ], 13);
-                    } else {
-                        alert("No se encontró la ubicación.");
-                    }
-                }
-            } catch (error) {
-                console.error("Error buscando:", error);
-            }
-        }
-    }
-
-    window.onload = cargarDatos;
-    map.on('moveend', dibujarTodo);
-</script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>
