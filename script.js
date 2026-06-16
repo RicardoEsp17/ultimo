@@ -2,10 +2,11 @@ const stationEndpoint = "https://energia.serviciosmin.gob.es/ServiciosRestCarbur
 const fuelHistoryEndpoint = "https://energia.serviciosmin.gob.es/ServiciosRestCarburantes/PreciosCarburantes/EstacionesTerrestresHist/";
 const yahooBrentQuoteUrl = "https://es.finance.yahoo.com/quote/BZ=F/";
 const yahooBrentUrl = "https://query1.finance.yahoo.com/v8/finance/chart/BZ=F";
+const corsProxyUrl = "https://api.allorigins.win/raw?url=";
 const stationCacheKey = "pag3.stations.v1";
 const stationCacheDateKey = "pag3.stationsDate.v1";
-const historyCacheKey = "pag3.history.v3";
-const historyCacheDateKey = "pag3.historyDate.v3";
+const historyCacheKey = "pag3.history.v4";
+const historyCacheDateKey = "pag3.historyDate.v4";
 
 const fuelConfig = {
   gas95: {
@@ -105,6 +106,23 @@ function parsePrice(value) {
   if (!value) return null;
   const parsed = Number(String(value).replace(",", ".").replace(/[^\d.-]/g, ""));
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+async function fetchTextReal(url) {
+  try {
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    return response.text();
+  } catch (directError) {
+    const proxyResponse = await fetch(`${corsProxyUrl}${encodeURIComponent(url)}`, { cache: "no-store" });
+    if (!proxyResponse.ok) throw directError;
+    return proxyResponse.text();
+  }
+}
+
+async function fetchJsonReal(url) {
+  const text = await fetchTextReal(url);
+  return JSON.parse(text);
 }
 
 function formatComma(value, digits) {
@@ -328,12 +346,29 @@ function popupHtml(station) {
   `;
 }
 
+function getMapVisibleWidthKm() {
+  if (!map || typeof map.getBounds !== "function") return 0;
+  const bounds = map.getBounds();
+  const center = bounds.getCenter();
+  const west = L.latLng(center.lat, bounds.getWest());
+  const east = L.latLng(center.lat, bounds.getEast());
+  return west.distanceTo(east) / 1000;
+}
+
 function renderStations() {
   const list = document.getElementById("stationList");
   if (!list) return;
 
-  const valid = stations.filter(station => station.lat != null && station.lon != null && getFuelPrice(station) != null);
   const bounds = map ? map.getBounds() : null;
+  const visibleWidthKm = getMapVisibleWidthKm();
+  if (visibleWidthKm > 20) {
+    visibleStations = [];
+    list.innerHTML = `<div class="empty-message">Acerca el mapa a menos de 20 km para ver gasolineras.</div>`;
+    if (markersLayer) markersLayer.clearLayers();
+    return;
+  }
+
+  const valid = stations.filter(station => station.lat != null && station.lon != null && getFuelPrice(station) != null);
   visibleStations = valid.filter(station => !bounds || bounds.contains([station.lat, station.lon]));
 
   if (!visibleStations.length) {
@@ -392,9 +427,7 @@ async function loadStations() {
   }
 
   try {
-    const response = await fetch(stationEndpoint, { cache: "no-store" });
-    if (!response.ok) throw new Error("HTTP " + response.status);
-    const payload = await response.json();
+    const payload = await fetchJsonReal(stationEndpoint);
     const list = Array.isArray(payload.ListaEESSPrecio) ? payload.ListaEESSPrecio : [];
     saveStationCache(list);
     applyRawStations(list);
@@ -441,9 +474,7 @@ async function fetchBrentFromYahoo(start, end) {
     const period1 = Math.floor(start.getTime() / 1000);
     const period2 = Math.floor((end.getTime() + 86400000) / 1000);
     const url = `${yahooBrentUrl}?period1=${period1}&period2=${period2}&interval=1d&includePrePost=false`;
-    const response = await fetch(url, { cache: "no-store" });
-    if (!response.ok) throw new Error("HTTP " + response.status);
-    const json = await response.json();
+    const json = await fetchJsonReal(url);
     const result = json.chart?.result?.[0];
     const timestamps = result?.timestamp || [];
     const closes = result?.indicators?.quote?.[0]?.close || [];
@@ -460,19 +491,6 @@ async function fetchBrentFromYahoo(start, end) {
   }
 }
 
-function buildRealisticBrentSeries(dates) {
-  const values = new Map();
-  const base = 82;
-  dates.forEach((day, index) => {
-    const trend = (index - dates.length + 1) * 0.06;
-    const wave = Math.sin(index / 3.2) * 1.9;
-    const smallMove = Math.cos(index / 1.9) * 0.65;
-    const value = Math.max(68, Math.min(96, base + trend + wave + smallMove));
-    values.set(dateKey(day), Number(value.toFixed(2)));
-  });
-  return values;
-}
-
 function averageFromRawList(rawList, field) {
   const values = rawList
     .filter(item => item && item["Tipo Venta"] === "P")
@@ -483,9 +501,7 @@ function averageFromRawList(rawList, field) {
 }
 
 async function fetchFuelHistoryDay(day) {
-  const response = await fetch(`${fuelHistoryEndpoint}${dateForApi(day)}`, { cache: "no-store" });
-  if (!response.ok) throw new Error("HTTP " + response.status);
-  const payload = await response.json();
+  const payload = await fetchJsonReal(`${fuelHistoryEndpoint}${dateForApi(day)}`);
   const list = Array.isArray(payload.ListaEESSPrecio) ? payload.ListaEESSPrecio : [];
   return {
     gas95: averageFromRawList(list, fuelConfig.gas95.field),
@@ -519,11 +535,10 @@ function buildCurrentAverageHistory(dates) {
     diesel: getAverage("diesel"),
     dieselPlus: getAverage("dieselPlus")
   };
-  const brentFallback = buildRealisticBrentSeries(dates);
   return dates.map(day => ({
     date: dateKey(day),
     label: day.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit" }),
-    brent: brentFallback.get(dateKey(day)),
+    brent: null,
     gas95: averages.gas95,
     diesel: averages.diesel,
     dieselPlus: averages.dieselPlus
@@ -553,7 +568,6 @@ async function buildHistory() {
     fetchBrentSeries(dates[0], dates[dates.length - 1]),
     fetchFuelHistorySeries(dates)
   ]);
-  const brentFallback = buildRealisticBrentSeries(dates);
   let carryBrent = null;
   let carryFuel = {
     gas95: getAverage("gas95"),
@@ -564,7 +578,6 @@ async function buildHistory() {
   const nextPoints = dates.map(day => {
     const key = dateKey(day);
     if (brentMap.has(key)) carryBrent = brentMap.get(key);
-    if (carryBrent == null) carryBrent = brentFallback.get(key);
     const realFuel = fuelHistoryMap.get(key);
     if (realFuel && (realFuel.gas95 || realFuel.diesel || realFuel.dieselPlus)) {
       carryFuel = {
@@ -735,3 +748,4 @@ document.addEventListener("DOMContentLoaded", () => {
   bindEvents();
   loadStations();
 });
+
