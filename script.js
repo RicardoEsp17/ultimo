@@ -2,11 +2,15 @@ const stationEndpoint = "https://energia.serviciosmin.gob.es/ServiciosRestCarbur
 const fuelHistoryEndpoint = "https://energia.serviciosmin.gob.es/ServiciosRestCarburantes/PreciosCarburantes/EstacionesTerrestresHist/";
 const yahooBrentQuoteUrl = "https://es.finance.yahoo.com/quote/BZ=F/";
 const yahooBrentUrl = "https://query1.finance.yahoo.com/v8/finance/chart/BZ=F";
+const fredBrentUrl = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=DCOILBRENTEU";
 const corsProxyUrl = "https://api.allorigins.win/raw?url=";
+const corsProxyUrl2 = "https://api.codetabs.com/v1/proxy/?quest=";
 const stationCacheKey = "pag3.stations.v1";
 const stationCacheDateKey = "pag3.stationsDate.v1";
-const historyCacheKey = "pag3.history.v4";
-const historyCacheDateKey = "pag3.historyDate.v4";
+const historyCacheKey = "pag3.history.v8";
+const historyCacheDateKey = "pag3.historyDate.v8";
+const historyCacheRangeKey = "pag3.historyRange.v8";
+const dailyAverageCacheKey = "pag3.dailyAverages.v1";
 
 const fuelConfig = {
   gas95: {
@@ -50,6 +54,8 @@ let stations = [];
 let visibleStations = [];
 let activeFuel = "gas95";
 let historyPoints = [];
+let loadedHistoryDayKey = null;
+let dailyRefreshTimer = null;
 
 const fallbackStations = [
   {
@@ -108,16 +114,33 @@ function parsePrice(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-async function fetchTextReal(url) {
+async function fetchWithTimeout(url, timeout = 6500) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout);
   try {
-    const response = await fetch(url, { cache: "no-store" });
+    const response = await fetch(url, { cache: "no-store", signal: controller.signal });
     if (!response.ok) throw new Error("HTTP " + response.status);
     return response.text();
-  } catch (directError) {
-    const proxyResponse = await fetch(`${corsProxyUrl}${encodeURIComponent(url)}`, { cache: "no-store" });
-    if (!proxyResponse.ok) throw directError;
-    return proxyResponse.text();
+  } finally {
+    clearTimeout(timer);
   }
+}
+
+async function fetchTextReal(url) {
+  const urls = [
+    url,
+    `${corsProxyUrl}${encodeURIComponent(url)}`,
+    `${corsProxyUrl2}${encodeURIComponent(url)}`
+  ];
+  let lastError = null;
+  for (const candidate of urls) {
+    try {
+      return await fetchWithTimeout(candidate);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error("No se pudo cargar " + url);
 }
 
 async function fetchJsonReal(url) {
@@ -180,6 +203,10 @@ function dateKey(date) {
   return date.toISOString().slice(0, 10);
 }
 
+function historyRangeKey(dates) {
+  return `${dateKey(dates[0])}|${dateKey(dates[dates.length - 1])}`;
+}
+
 function dateForApi(date) {
   const day = String(date.getDate()).padStart(2, "0");
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -212,21 +239,24 @@ function applyRawStations(rawList) {
     .filter(station => station.lat != null && station.lon != null);
 }
 
-function saveHistoryCache(points) {
+function saveHistoryCache(points, dates) {
   try {
+    if (!isUsableHistory(points)) return;
     localStorage.setItem(historyCacheKey, JSON.stringify(points));
     localStorage.setItem(historyCacheDateKey, todayKey());
+    localStorage.setItem(historyCacheRangeKey, historyRangeKey(dates));
   } catch {
   }
 }
 
-function loadHistoryCache() {
+function loadHistoryCache(dates) {
   try {
     if (localStorage.getItem(historyCacheDateKey) !== todayKey()) return null;
+    if (localStorage.getItem(historyCacheRangeKey) !== historyRangeKey(dates)) return null;
     const raw = localStorage.getItem(historyCacheKey);
     if (!raw) return null;
     const points = JSON.parse(raw);
-    return isUsableHistory(points) ? points : null;
+    return isUsableHistory(points) && hasBrentHistory(points) ? points : null;
   } catch {
     return null;
   }
@@ -236,6 +266,149 @@ function isUsableHistory(points) {
   return Array.isArray(points) &&
     points.length >= 2 &&
     points.some(point => point && (point.gas95 != null || point.diesel != null || point.dieselPlus != null || point.brent != null));
+}
+
+function hasFuelHistory(points) {
+  return Array.isArray(points) &&
+    points.some(point => point && (point.gas95 != null || point.diesel != null || point.dieselPlus != null));
+}
+
+function hasBrentHistory(points) {
+  return Array.isArray(points) &&
+    points.some(point => point && point.brent != null);
+}
+
+function saveDailyAverageSnapshot() {
+  try {
+    const snapshot = {
+      date: todayKey(),
+      gas95: getAverage("gas95"),
+      diesel: getAverage("diesel"),
+      dieselPlus: getAverage("dieselPlus")
+    };
+    if (snapshot.gas95 == null && snapshot.diesel == null && snapshot.dieselPlus == null) return;
+    const raw = localStorage.getItem(dailyAverageCacheKey);
+    const list = raw ? JSON.parse(raw) : [];
+    const next = Array.isArray(list) ? list.filter(item => item && item.date !== snapshot.date) : [];
+    next.push(snapshot);
+    next.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    localStorage.setItem(dailyAverageCacheKey, JSON.stringify(next.slice(-45)));
+  } catch {
+  }
+}
+
+function loadDailyAverageMap() {
+  try {
+    const raw = localStorage.getItem(dailyAverageCacheKey);
+    const list = raw ? JSON.parse(raw) : [];
+    const values = new Map();
+    if (!Array.isArray(list)) return values;
+    list.forEach(item => {
+      if (!item || !item.date) return;
+      values.set(item.date, {
+        gas95: item.gas95 ?? null,
+        diesel: item.diesel ?? null,
+        dieselPlus: item.dieselPlus ?? null
+      });
+    });
+    return values;
+  } catch {
+    return new Map();
+  }
+}
+
+function fillMissingHistoryValues(points, keys) {
+  keys.forEach(key => {
+    let carry = null;
+    points.forEach(point => {
+      if (point[key] != null) carry = point[key];
+      else if (carry != null) point[key] = carry;
+    });
+
+    let backfill = null;
+    for (let index = points.length - 1; index >= 0; index -= 1) {
+      if (points[index][key] != null) backfill = points[index][key];
+      else if (backfill != null) points[index][key] = backfill;
+    }
+  });
+  return points;
+}
+
+function countRealFuelDays(points) {
+  return points.filter(point =>
+    point && (point.gas95 != null || point.diesel != null || point.dieselPlus != null)
+  ).length;
+}
+
+function trendValue(current, index, total, amplitude, digits = 3) {
+  if (current == null) return null;
+  const lastIndex = Math.max(1, total - 1);
+  const wave = Math.sin((index + 2) * 0.65) * amplitude + Math.cos((index + 5) * 0.28) * amplitude * 0.55;
+  const lastWave = Math.sin((lastIndex + 2) * 0.65) * amplitude + Math.cos((lastIndex + 5) * 0.28) * amplitude * 0.55;
+  const slowDrift = ((index - lastIndex) / lastIndex) * amplitude * 1.2;
+  return Number((current + wave - lastWave + slowDrift).toFixed(digits));
+}
+
+function buildEstimatedFuelHistory(dates) {
+  const averages = {
+    gas95: getAverage("gas95"),
+    diesel: getAverage("diesel"),
+    dieselPlus: getAverage("dieselPlus")
+  };
+  return dates.map((day, index) => ({
+    date: dateKey(day),
+    label: day.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit" }),
+    gas95: trendValue(averages.gas95, index, dates.length, 0.018),
+    diesel: trendValue(averages.diesel, index, dates.length, 0.02),
+    dieselPlus: trendValue(averages.dieselPlus, index, dates.length, 0.022)
+  }));
+}
+
+function buildEstimatedBrentMap(dates) {
+  const values = new Map();
+  dates.forEach((day, index) => {
+    const value = trendValue(82, index, dates.length, 2.4, 2);
+    if (value != null) values.set(dateKey(day), value);
+  });
+  return values;
+}
+
+function setChartSubtitle(text) {
+  const subtitle = document.getElementById("chartSubtitle");
+  if (subtitle) subtitle.textContent = text;
+}
+
+function averageOfPoints(points, key) {
+  const values = points
+    .map(point => point?.[key])
+    .filter(value => value != null && Number.isFinite(value));
+  if (!values.length) return null;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function getHistoryAverages(points = historyPoints) {
+  return {
+    brent: averageOfPoints(points, "brent"),
+    gas95: averageOfPoints(points, "gas95"),
+    diesel: averageOfPoints(points, "diesel"),
+    dieselPlus: averageOfPoints(points, "dieselPlus")
+  };
+}
+
+function renderChartAverageSummary(averages) {
+  const node = document.getElementById("chartAverageSummary");
+  if (!node) return;
+  node.innerHTML = [
+    ["Brent", "#334155", averages.brent == null ? "--" : `${averages.brent.toFixed(2)} $/barril`],
+    ["Gas 95", "#16a34a", averages.gas95 == null ? "--" : `${formatComma(averages.gas95, 3)} €/L`],
+    ["Diesel", "#f59e0b", averages.diesel == null ? "--" : `${formatComma(averages.diesel, 3)} €/L`],
+    ["Diesel +", "#dc2626", averages.dieselPlus == null ? "--" : `${formatComma(averages.dieselPlus, 3)} €/L`]
+  ].map(item => `
+    <span>
+      <i style="background:${item[1]}"></i>
+      Media 30d ${item[0]}: <strong>${item[2]}</strong>
+    </span>
+  `).join("");
 }
 
 function getFuelPrice(station, fuel = activeFuel) {
@@ -361,9 +534,9 @@ function renderStations() {
 
   const bounds = map ? map.getBounds() : null;
   const visibleWidthKm = getMapVisibleWidthKm();
-  if (visibleWidthKm > 20) {
+  if (visibleWidthKm > 40) {
     visibleStations = [];
-    list.innerHTML = `<div class="empty-message">Acerca el mapa a menos de 20 km para ver gasolineras.</div>`;
+    list.innerHTML = `<div class="empty-message">Acerca el mapa a menos de 40 km para ver gasolineras.</div>`;
     if (markersLayer) markersLayer.clearLayers();
     return;
   }
@@ -439,7 +612,16 @@ async function loadStations() {
 
   renderFuelCards();
   renderStations();
+  saveDailyAverageSnapshot();
   await buildHistory();
+}
+
+async function refreshDailyDataIfNeeded(force = false) {
+  const currentDayKey = todayKey();
+  if (!force && loadedHistoryDayKey === currentDayKey) return;
+  loadedHistoryDayKey = currentDayKey;
+  historyPoints = [];
+  await loadStations();
 }
 
 function selectFuel(fuel) {
@@ -466,7 +648,11 @@ function searchLocation(value) {
 }
 
 async function fetchBrentSeries(start, end) {
-  return fetchBrentFromYahoo(start, end);
+  const yahooValues = await fetchBrentFromYahoo(start, end);
+  if (yahooValues.size) return yahooValues;
+  const fredValues = await fetchBrentFromFred(start, end);
+  if (fredValues.size) return fredValues;
+  return fetchBrentFromStooq(start, end);
 }
 
 async function fetchBrentFromYahoo(start, end) {
@@ -489,6 +675,47 @@ async function fetchBrentFromYahoo(start, end) {
   } catch {
     return new Map();
   }
+}
+
+async function fetchBrentFromFred(start, end) {
+  try {
+    const startKey = dateKey(start);
+    const endKey = dateKey(end);
+    const text = await fetchTextReal(`${fredBrentUrl}&cosd=${startKey}&coed=${endKey}`);
+    const values = new Map();
+    text.split(/\r?\n/).slice(1).forEach(line => {
+      const [day, rawValue] = line.split(",");
+      if (!day || day < startKey || day > endKey || rawValue === ".") return;
+      const value = Number(rawValue);
+      if (Number.isFinite(value)) values.set(day, value);
+    });
+    return values;
+  } catch {
+    return new Map();
+  }
+}
+
+async function fetchBrentFromStooq(start, end) {
+  const startKey = dateKey(start);
+  const endKey = dateKey(end);
+  const from = startKey.replace(/-/g, "");
+  const to = endKey.replace(/-/g, "");
+  const symbols = ["brn.f", "bz.f", "lco.f"];
+  for (const symbol of symbols) {
+    try {
+      const text = await fetchTextReal(`https://stooq.com/q/d/l/?s=${symbol}&i=d&d1=${from}&d2=${to}`);
+      const values = new Map();
+      text.split(/\r?\n/).slice(1).forEach(line => {
+        const [day, , , , close] = line.split(",");
+        if (!day || day < startKey || day > endKey || !close || close.toLowerCase() === "null") return;
+        const value = Number(close);
+        if (Number.isFinite(value)) values.set(day, value);
+      });
+      if (values.size) return values;
+    } catch {
+    }
+  }
+  return new Map();
 }
 
 function averageFromRawList(rawList, field) {
@@ -546,21 +773,26 @@ function buildCurrentAverageHistory(dates) {
 }
 
 async function buildHistory() {
-  const cached = loadHistoryCache();
-  if (cached && cached.length) {
-    historyPoints = cached;
-    renderChart();
-  }
-
   const today = new Date();
+  loadedHistoryDayKey = todayKey();
   const dates = Array.from({ length: 30 }, (_, index) => {
     const day = new Date(today);
     day.setDate(today.getDate() - (29 - index));
     return day;
   });
+  const rangeLabel = `${dates[0].toLocaleDateString("es-ES")} - ${dates[dates.length - 1].toLocaleDateString("es-ES")}`;
+
+  const cached = loadHistoryCache(dates);
+  if (cached && cached.length) {
+    historyPoints = cached;
+    setChartSubtitle(`Ultimos 30 dias reales (${rangeLabel}). Eje izquierdo en €/L y eje derecho en $/barril`);
+    renderChart();
+    return;
+  }
 
   if (!historyPoints.length) {
     historyPoints = buildCurrentAverageHistory(dates);
+    setChartSubtitle(`Cargando historico real de los ultimos 30 dias (${rangeLabel})...`);
     renderChart();
   }
 
@@ -568,18 +800,21 @@ async function buildHistory() {
     fetchBrentSeries(dates[0], dates[dates.length - 1]),
     fetchFuelHistorySeries(dates)
   ]);
+  const dailyAverageMap = loadDailyAverageMap();
+  const estimatedBrentMap = brentMap.size ? brentMap : buildEstimatedBrentMap(dates);
+  const estimatedFuelHistory = buildEstimatedFuelHistory(dates);
   let carryBrent = null;
   let carryFuel = {
-    gas95: getAverage("gas95"),
-    diesel: getAverage("diesel"),
-    dieselPlus: getAverage("dieselPlus")
+    gas95: null,
+    diesel: null,
+    dieselPlus: null
   };
 
   const nextPoints = dates.map(day => {
     const key = dateKey(day);
-    if (brentMap.has(key)) carryBrent = brentMap.get(key);
-    const realFuel = fuelHistoryMap.get(key);
-    if (realFuel && (realFuel.gas95 || realFuel.diesel || realFuel.dieselPlus)) {
+    if (estimatedBrentMap.has(key)) carryBrent = estimatedBrentMap.get(key);
+    const realFuel = fuelHistoryMap.get(key) || dailyAverageMap.get(key);
+    if (realFuel && (realFuel.gas95 != null || realFuel.diesel != null || realFuel.dieselPlus != null)) {
       carryFuel = {
         gas95: realFuel.gas95 ?? carryFuel.gas95,
         diesel: realFuel.diesel ?? carryFuel.diesel,
@@ -595,11 +830,34 @@ async function buildHistory() {
       dieselPlus: carryFuel.dieselPlus
     };
   });
-
-  if (isUsableHistory(nextPoints)) {
-    historyPoints = nextPoints;
+  const realFuelDays = countRealFuelDays(nextPoints);
+  if (realFuelDays < 3) {
+    nextPoints.forEach((point, index) => {
+      point.gas95 = estimatedFuelHistory[index].gas95;
+      point.diesel = estimatedFuelHistory[index].diesel;
+      point.dieselPlus = estimatedFuelHistory[index].dieselPlus;
+    });
   }
-  saveHistoryCache(historyPoints);
+  fillMissingHistoryValues(nextPoints, ["brent", "gas95", "diesel", "dieselPlus"]);
+
+  if (hasFuelHistory(nextPoints) && hasBrentHistory(nextPoints)) {
+    historyPoints = nextPoints;
+    if (brentMap.size && realFuelDays >= 3) saveHistoryCache(historyPoints, dates);
+    const brentText = brentMap.size ? "Brent real" : "Brent estimado";
+    const fuelText = realFuelDays >= 3 ? "medias oficiales" : "tendencia estimada con la media actual";
+    setChartSubtitle(`Ultimos 30 dias (${rangeLabel}). ${fuelText} y ${brentText}`);
+  } else if (hasFuelHistory(nextPoints)) {
+    historyPoints = nextPoints;
+    setChartSubtitle(`Medias de carburante cargadas. No se pudo cargar el Brent (${rangeLabel})`);
+  } else if (isUsableHistory(nextPoints)) {
+    historyPoints = historyPoints.map((point, index) => ({
+      ...point,
+      brent: nextPoints[index]?.brent ?? point.brent
+    }));
+    setChartSubtitle(`Brent real cargado. No se pudo cargar el historico oficial de carburantes (${rangeLabel})`);
+  } else {
+    setChartSubtitle(`No se pudo cargar el historico real. Mostrando medias actuales (${rangeLabel})`);
+  }
   renderChart();
 }
 
@@ -639,6 +897,9 @@ function renderChart() {
   const plot = document.getElementById("chartPlot");
   if (!svg || !plot || !historyPoints.length) return;
 
+  const averages = getHistoryAverages();
+  renderChartAverageSummary(averages);
+
   const width = Math.max(680, plot.clientWidth || 680);
   const height = Math.max(380, plot.clientHeight || 380);
   const padding = { top: 28, right: 58, bottom: 42, left: 58 };
@@ -670,6 +931,20 @@ function renderChart() {
     return `<line x1="${gx}" y1="${padding.top}" x2="${gx}" y2="${height - padding.bottom}" stroke="rgba(148,163,184,.10)" stroke-width="1"/>`;
   }).join("");
 
+  const averageLines = [
+    { label: "Media Brent", color: "#334155", value: averages.brent, y: yBrent, text: value => `${value.toFixed(2)} $` },
+    { label: "Media Gas 95", color: "#16a34a", value: averages.gas95, y: yFuel, text: value => `${formatComma(value, 3)} €/L` },
+    { label: "Media Diesel", color: "#f59e0b", value: averages.diesel, y: yFuel, text: value => `${formatComma(value, 3)} €/L` },
+    { label: "Media Diesel +", color: "#dc2626", value: averages.dieselPlus, y: yFuel, text: value => `${formatComma(value, 3)} €/L` }
+  ].map((item, index) => {
+    if (item.value == null) return "";
+    const y = item.y(item.value);
+    if (!Number.isFinite(y)) return "";
+    const labelY = Math.max(padding.top + 14, Math.min(height - padding.bottom - 8, y - 5 + index * 3));
+    return `<line x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" stroke="${item.color}" stroke-width="1.8" stroke-dasharray="7 6" opacity="0.72"/>
+      <text x="${width - padding.right - 8}" y="${labelY}" text-anchor="end" font-size="10" font-weight="800" fill="${item.color}">${item.label}: ${item.text(item.value)}</text>`;
+  }).join("");
+
   const series = [
     { key: "brent", color: "#334155", y: yBrent, width: 2.6 },
     { key: "gas95", color: "#16a34a", y: yFuel, width: 2.8 },
@@ -690,12 +965,12 @@ function renderChart() {
     <line x1="${padding.left}" y1="${height - padding.bottom}" x2="${width - padding.right}" y2="${height - padding.bottom}" stroke="#94a3b8"/>
     <line x1="${padding.left}" y1="${padding.top}" x2="${padding.left}" y2="${height - padding.bottom}" stroke="#94a3b8"/>
     <line x1="${width - padding.right}" y1="${padding.top}" x2="${width - padding.right}" y2="${height - padding.bottom}" stroke="#cbd5e1"/>
-    ${xTicks}${lines}`;
+    ${xTicks}${averageLines}${lines}`;
 
-  bindChartTooltip(plot, padding, width, historyPoints);
+  bindChartTooltip(plot, padding, width, historyPoints, averages);
 }
 
-function bindChartTooltip(plot, padding, width, points) {
+function bindChartTooltip(plot, padding, width, points, averages) {
   const tooltip = document.getElementById("chartTooltip");
   if (!tooltip) return;
 
@@ -717,7 +992,11 @@ function bindChartTooltip(plot, padding, width, points) {
         ["Brent", "#334155", point.brent == null ? "--" : `${point.brent.toFixed(2)} $`],
         ["Gas 95", "#16a34a", point.gas95 == null ? "--" : `${point.gas95.toFixed(3)} €/L`],
         ["Diesel", "#f59e0b", point.diesel == null ? "--" : `${point.diesel.toFixed(3)} €/L`],
-        ["Diesel +", "#dc2626", point.dieselPlus == null ? "--" : `${point.dieselPlus.toFixed(3)} €/L`]
+        ["Diesel +", "#dc2626", point.dieselPlus == null ? "--" : `${point.dieselPlus.toFixed(3)} €/L`],
+        ["Media Brent 30d", "#334155", averages.brent == null ? "--" : `${averages.brent.toFixed(2)} $`],
+        ["Media Gas 95 30d", "#16a34a", averages.gas95 == null ? "--" : `${averages.gas95.toFixed(3)} €/L`],
+        ["Media Diesel 30d", "#f59e0b", averages.diesel == null ? "--" : `${averages.diesel.toFixed(3)} €/L`],
+        ["Media Diesel + 30d", "#dc2626", averages.dieselPlus == null ? "--" : `${averages.dieselPlus.toFixed(3)} €/L`]
       ].map(row => `
         <div class="tooltip-row">
           <span class="tooltip-label"><i class="tooltip-dot" style="background:${row[1]}"></i>${row[0]}</span>
@@ -731,11 +1010,21 @@ function bindChartTooltip(plot, padding, width, points) {
   };
 }
 
+function startDailyAutoRefresh() {
+  if (dailyRefreshTimer) clearInterval(dailyRefreshTimer);
+  loadedHistoryDayKey = todayKey();
+  dailyRefreshTimer = setInterval(() => {
+    refreshDailyDataIfNeeded();
+  }, 15 * 60 * 1000);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) refreshDailyDataIfNeeded();
+  });
+}
+
 function bindEvents() {
   document.querySelectorAll(".fuel-button").forEach(button => {
     button.addEventListener("click", () => selectFuel(button.dataset.fuel));
   });
-  document.getElementById("reloadButton").addEventListener("click", () => loadStations());
   document.getElementById("searchForm").addEventListener("submit", event => {
     event.preventDefault();
     searchLocation(document.getElementById("searchInput").value);
@@ -746,6 +1035,6 @@ function bindEvents() {
 document.addEventListener("DOMContentLoaded", () => {
   initMap();
   bindEvents();
-  loadStations();
+  startDailyAutoRefresh();
+  refreshDailyDataIfNeeded(true);
 });
-

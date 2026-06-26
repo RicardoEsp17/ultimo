@@ -398,6 +398,37 @@ h1 {
 .chart-head h2 { margin: 0; font-size: 1.02rem; }
 .chart-head p { margin: 4px 0 0; color: var(--muted); font-size: 0.82rem; }
 
+.chart-average-summary {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chart-average-summary span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border: 1px solid #dbe3ec;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.chart-average-summary i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: 0 0 9px;
+}
+
+.chart-average-summary strong {
+  color: #0f172a;
+}
+
 .legend {
   display: flex;
   flex-wrap: wrap;
