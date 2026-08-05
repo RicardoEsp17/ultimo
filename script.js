@@ -54,8 +54,6 @@ let stations = [];
 let visibleStations = [];
 let activeFuel = "gas95";
 let historyPoints = [];
-let loadedHistoryDayKey = null;
-let dailyRefreshTimer = null;
 
 const fallbackStations = [
   {
@@ -378,39 +376,6 @@ function setChartSubtitle(text) {
   if (subtitle) subtitle.textContent = text;
 }
 
-function averageOfPoints(points, key) {
-  const values = points
-    .map(point => point?.[key])
-    .filter(value => value != null && Number.isFinite(value));
-  if (!values.length) return null;
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
-}
-
-function getHistoryAverages(points = historyPoints) {
-  return {
-    brent: averageOfPoints(points, "brent"),
-    gas95: averageOfPoints(points, "gas95"),
-    diesel: averageOfPoints(points, "diesel"),
-    dieselPlus: averageOfPoints(points, "dieselPlus")
-  };
-}
-
-function renderChartAverageSummary(averages) {
-  const node = document.getElementById("chartAverageSummary");
-  if (!node) return;
-  node.innerHTML = [
-    ["Brent", "#334155", averages.brent == null ? "--" : `${averages.brent.toFixed(2)} $/barril`],
-    ["Gas 95", "#16a34a", averages.gas95 == null ? "--" : `${formatComma(averages.gas95, 3)} €/L`],
-    ["Diesel", "#f59e0b", averages.diesel == null ? "--" : `${formatComma(averages.diesel, 3)} €/L`],
-    ["Diesel +", "#dc2626", averages.dieselPlus == null ? "--" : `${formatComma(averages.dieselPlus, 3)} €/L`]
-  ].map(item => `
-    <span>
-      <i style="background:${item[1]}"></i>
-      Media 30d ${item[0]}: <strong>${item[2]}</strong>
-    </span>
-  `).join("");
-}
-
 function getFuelPrice(station, fuel = activeFuel) {
   return station[fuel];
 }
@@ -616,14 +581,6 @@ async function loadStations() {
   await buildHistory();
 }
 
-async function refreshDailyDataIfNeeded(force = false) {
-  const currentDayKey = todayKey();
-  if (!force && loadedHistoryDayKey === currentDayKey) return;
-  loadedHistoryDayKey = currentDayKey;
-  historyPoints = [];
-  await loadStations();
-}
-
 function selectFuel(fuel) {
   activeFuel = fuel;
   document.querySelectorAll(".fuel-button").forEach(button => {
@@ -774,7 +731,6 @@ function buildCurrentAverageHistory(dates) {
 
 async function buildHistory() {
   const today = new Date();
-  loadedHistoryDayKey = todayKey();
   const dates = Array.from({ length: 30 }, (_, index) => {
     const day = new Date(today);
     day.setDate(today.getDate() - (29 - index));
@@ -897,9 +853,6 @@ function renderChart() {
   const plot = document.getElementById("chartPlot");
   if (!svg || !plot || !historyPoints.length) return;
 
-  const averages = getHistoryAverages();
-  renderChartAverageSummary(averages);
-
   const width = Math.max(680, plot.clientWidth || 680);
   const height = Math.max(380, plot.clientHeight || 380);
   const padding = { top: 28, right: 58, bottom: 42, left: 58 };
@@ -931,20 +884,6 @@ function renderChart() {
     return `<line x1="${gx}" y1="${padding.top}" x2="${gx}" y2="${height - padding.bottom}" stroke="rgba(148,163,184,.10)" stroke-width="1"/>`;
   }).join("");
 
-  const averageLines = [
-    { label: "Media Brent", color: "#334155", value: averages.brent, y: yBrent, text: value => `${value.toFixed(2)} $` },
-    { label: "Media Gas 95", color: "#16a34a", value: averages.gas95, y: yFuel, text: value => `${formatComma(value, 3)} €/L` },
-    { label: "Media Diesel", color: "#f59e0b", value: averages.diesel, y: yFuel, text: value => `${formatComma(value, 3)} €/L` },
-    { label: "Media Diesel +", color: "#dc2626", value: averages.dieselPlus, y: yFuel, text: value => `${formatComma(value, 3)} €/L` }
-  ].map((item, index) => {
-    if (item.value == null) return "";
-    const y = item.y(item.value);
-    if (!Number.isFinite(y)) return "";
-    const labelY = Math.max(padding.top + 14, Math.min(height - padding.bottom - 8, y - 5 + index * 3));
-    return `<line x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" stroke="${item.color}" stroke-width="1.8" stroke-dasharray="7 6" opacity="0.72"/>
-      <text x="${width - padding.right - 8}" y="${labelY}" text-anchor="end" font-size="10" font-weight="800" fill="${item.color}">${item.label}: ${item.text(item.value)}</text>`;
-  }).join("");
-
   const series = [
     { key: "brent", color: "#334155", y: yBrent, width: 2.6 },
     { key: "gas95", color: "#16a34a", y: yFuel, width: 2.8 },
@@ -965,12 +904,12 @@ function renderChart() {
     <line x1="${padding.left}" y1="${height - padding.bottom}" x2="${width - padding.right}" y2="${height - padding.bottom}" stroke="#94a3b8"/>
     <line x1="${padding.left}" y1="${padding.top}" x2="${padding.left}" y2="${height - padding.bottom}" stroke="#94a3b8"/>
     <line x1="${width - padding.right}" y1="${padding.top}" x2="${width - padding.right}" y2="${height - padding.bottom}" stroke="#cbd5e1"/>
-    ${xTicks}${averageLines}${lines}`;
+    ${xTicks}${lines}`;
 
-  bindChartTooltip(plot, padding, width, historyPoints, averages);
+  bindChartTooltip(plot, padding, width, historyPoints);
 }
 
-function bindChartTooltip(plot, padding, width, points, averages) {
+function bindChartTooltip(plot, padding, width, points) {
   const tooltip = document.getElementById("chartTooltip");
   if (!tooltip) return;
 
@@ -992,11 +931,7 @@ function bindChartTooltip(plot, padding, width, points, averages) {
         ["Brent", "#334155", point.brent == null ? "--" : `${point.brent.toFixed(2)} $`],
         ["Gas 95", "#16a34a", point.gas95 == null ? "--" : `${point.gas95.toFixed(3)} €/L`],
         ["Diesel", "#f59e0b", point.diesel == null ? "--" : `${point.diesel.toFixed(3)} €/L`],
-        ["Diesel +", "#dc2626", point.dieselPlus == null ? "--" : `${point.dieselPlus.toFixed(3)} €/L`],
-        ["Media Brent 30d", "#334155", averages.brent == null ? "--" : `${averages.brent.toFixed(2)} $`],
-        ["Media Gas 95 30d", "#16a34a", averages.gas95 == null ? "--" : `${averages.gas95.toFixed(3)} €/L`],
-        ["Media Diesel 30d", "#f59e0b", averages.diesel == null ? "--" : `${averages.diesel.toFixed(3)} €/L`],
-        ["Media Diesel + 30d", "#dc2626", averages.dieselPlus == null ? "--" : `${averages.dieselPlus.toFixed(3)} €/L`]
+        ["Diesel +", "#dc2626", point.dieselPlus == null ? "--" : `${point.dieselPlus.toFixed(3)} €/L`]
       ].map(row => `
         <div class="tooltip-row">
           <span class="tooltip-label"><i class="tooltip-dot" style="background:${row[1]}"></i>${row[0]}</span>
@@ -1008,17 +943,6 @@ function bindChartTooltip(plot, padding, width, points, averages) {
     tooltip.style.top = "14px";
     tooltip.classList.add("visible");
   };
-}
-
-function startDailyAutoRefresh() {
-  if (dailyRefreshTimer) clearInterval(dailyRefreshTimer);
-  loadedHistoryDayKey = todayKey();
-  dailyRefreshTimer = setInterval(() => {
-    refreshDailyDataIfNeeded();
-  }, 15 * 60 * 1000);
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) refreshDailyDataIfNeeded();
-  });
 }
 
 function bindEvents() {
@@ -1035,6 +959,5 @@ function bindEvents() {
 document.addEventListener("DOMContentLoaded", () => {
   initMap();
   bindEvents();
-  startDailyAutoRefresh();
-  refreshDailyDataIfNeeded(true);
+  loadStations();
 });
