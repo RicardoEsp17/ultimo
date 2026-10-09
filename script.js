@@ -741,6 +741,27 @@ function averageFromRawList(rawList, field) {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
+async function fetchStoredFuelHistory() {
+  try {
+    // Este JSON lo actualiza GitHub Actions una vez al día y se sirve junto a la web.
+    const response = await fetch("./data/fuel-history.json", { cache: "no-store" });
+    if (!response.ok) return new Map();
+    const payload = await response.json();
+    const values = new Map();
+    (Array.isArray(payload.days) ? payload.days : []).forEach(item => {
+      if (!item || !item.date) return;
+      values.set(item.date, {
+        gas95: parsePrice(item.gas95),
+        diesel: parsePrice(item.diesel),
+        dieselPlus: parsePrice(item.dieselPlus)
+      });
+    });
+    return values;
+  } catch {
+    return new Map();
+  }
+}
+
 async function fetchFuelHistoryDay(day) {
   const payload = await fetchJsonReal(`${fuelHistoryEndpoint}${dateForApi(day)}`);
   const list = Array.isArray(payload.ListaEESSPrecio) ? payload.ListaEESSPrecio : [];
@@ -809,9 +830,10 @@ async function buildHistory() {
     renderChart();
   }
 
-  const [brentMap, fuelHistoryMap] = await Promise.all([
+  const [brentMap, fuelHistoryMap, storedHistoryMap] = await Promise.all([
     fetchBrentSeries(dates[0], dates[dates.length - 1]),
-    fetchFuelHistorySeries(dates)
+    fetchFuelHistorySeries(dates),
+    fetchStoredFuelHistory()
   ]);
   const dailyAverageMap = loadDailyAverageMap();
   const estimatedBrentMap = brentMap.size ? brentMap : buildEstimatedBrentMap(dates);
@@ -826,7 +848,11 @@ async function buildHistory() {
   const nextPoints = dates.map(day => {
     const key = dateKey(day);
     if (estimatedBrentMap.has(key)) carryBrent = estimatedBrentMap.get(key);
-    const realFuel = fuelHistoryMap.get(key) || dailyAverageMap.get(key);
+    const storedFuel = storedHistoryMap.get(key);
+    const fetchedFuel = fuelHistoryMap.get(key);
+    const realFuel = storedFuel && (storedFuel.gas95 != null || storedFuel.diesel != null || storedFuel.dieselPlus != null)
+      ? storedFuel
+      : fetchedFuel || dailyAverageMap.get(key);
     if (realFuel && (realFuel.gas95 != null || realFuel.diesel != null || realFuel.dieselPlus != null)) {
       carryFuel = {
         gas95: realFuel.gas95 ?? carryFuel.gas95,
