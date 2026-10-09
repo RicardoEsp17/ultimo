@@ -1,0 +1,38 @@
+name: Actualizar histórico de carburantes
+
+on:
+  schedule:
+    - cron: "15 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-fuel-history
+  cancel-in-progress: false
+
+jobs:
+  update-history:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+      - name: Preparar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Consultar medias oficiales diarias
+        run: python scripts/update_fuel_history.py
+      - name: Guardar cambios
+        run: |
+          if git diff --quiet -- data/fuel-history.json; then
+            echo "No hay cambios en el histórico."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/fuel-history.json
+          git commit -m "Actualizar histórico diario de carburantes"
+          git push
