@@ -592,10 +592,10 @@ function selectFuel(fuel) {
 function normalizeSearchText(value) {
   return String(value || "")
     .normalize("NFD")
-    .replace(/[\\u0300-\\u036f]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLocaleLowerCase("es")
-    .replace(/[^a-z0-9\\s]/g, " ")
-    .replace(/\\s+/g, " ")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -622,12 +622,12 @@ function findCityMatch(query) {
   const normalizedQuery = normalizeSearchText(query);
   if (!normalizedQuery) return null;
 
-  // Primero prioriza coincidencias exactas o parciales, sin distinguir tildes ni mayúsculas.
+  // Prioriza coincidencias exactas y parciales antes de tolerar errores tipográficos.
   const directMatch = cities.find(city => normalizeSearchText(city) === normalizedQuery)
     || cities.find(city => normalizeSearchText(city).includes(normalizedQuery));
   if (directMatch) return directMatch;
 
-  // Después tolera pequeños errores tipográficos en el nombre de la ciudad.
+  // Solo acepta errores pequeños para evitar enviar al usuario a una ciudad distinta.
   const candidates = cities
     .map(city => {
       const normalizedCity = normalizeSearchText(city);
@@ -640,6 +640,8 @@ function findCityMatch(query) {
     })
     .sort((a, b) => a.distance - b.distance);
 
+  // Si hay empate entre varias ciudades, no adivina: no mueve el mapa.
+  if (candidates.length > 1 && candidates[0].distance === candidates[1].distance) return null;
   return candidates[0]?.city || null;
 }
 
@@ -648,7 +650,9 @@ function searchLocation(value) {
   if (!query) return;
 
   const cityMatch = findCityMatch(query);
-  const match = stations.find(station => normalizeSearchText(station.city) === cityMatch)
+  const match = (cityMatch
+    ? stations.find(station => normalizeSearchText(station.city) === normalizeSearchText(cityMatch))
+    : null)
     || stations.find(station => normalizeSearchText(station.cp) === query)
     || stations.find(station => normalizeSearchText(station.address).includes(query));
 
