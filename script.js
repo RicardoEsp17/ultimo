@@ -589,15 +589,68 @@ function selectFuel(fuel) {
   renderStations();
 }
 
+function normalizeSearchText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\\u0300-\\u036f]/g, "")
+    .toLocaleLowerCase("es")
+    .replace(/[^a-z0-9\\s]/g, " ")
+    .replace(/\\s+/g, " ")
+    .trim();
+}
+
+function levenshteinDistance(a, b) {
+  const previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+  for (let i = 1; i <= a.length; i += 1) {
+    let diagonal = previous[0];
+    previous[0] = i;
+    for (let j = 1; j <= b.length; j += 1) {
+      const above = previous[j];
+      previous[j] = Math.min(
+        previous[j] + 1,
+        previous[j - 1] + 1,
+        diagonal + (a[i - 1] === b[j - 1] ? 0 : 1)
+      );
+      diagonal = above;
+    }
+  }
+  return previous[b.length];
+}
+
+function findCityMatch(query) {
+  const cities = [...new Set(stations.map(station => station.city).filter(Boolean))];
+  const normalizedQuery = normalizeSearchText(query);
+  if (!normalizedQuery) return null;
+
+  // Primero prioriza coincidencias exactas o parciales, sin distinguir tildes ni mayúsculas.
+  const directMatch = cities.find(city => normalizeSearchText(city) === normalizedQuery)
+    || cities.find(city => normalizeSearchText(city).includes(normalizedQuery));
+  if (directMatch) return directMatch;
+
+  // Después tolera pequeños errores tipográficos en el nombre de la ciudad.
+  const candidates = cities
+    .map(city => {
+      const normalizedCity = normalizeSearchText(city);
+      return { city, distance: levenshteinDistance(normalizedQuery, normalizedCity) };
+    })
+    .filter(item => {
+      const length = Math.max(normalizedQuery.length, normalizeSearchText(item.city).length);
+      const maxDistance = length >= 10 ? 2 : length >= 5 ? 1 : 0;
+      return item.distance <= maxDistance;
+    })
+    .sort((a, b) => a.distance - b.distance);
+
+  return candidates[0]?.city || null;
+}
+
 function searchLocation(value) {
-  const query = value.trim().toLowerCase();
+  const query = normalizeSearchText(value);
   if (!query) return;
 
-  const match = stations.find(station =>
-    station.city.toLowerCase() === query ||
-    station.cp === query ||
-    station.address.toLowerCase().includes(query)
-  ) || stations.find(station => station.city.toLowerCase().includes(query));
+  const cityMatch = findCityMatch(query);
+  const match = stations.find(station => normalizeSearchText(station.city) === cityMatch)
+    || stations.find(station => normalizeSearchText(station.cp) === query)
+    || stations.find(station => normalizeSearchText(station.address).includes(query));
 
   if (match && map) {
     map.setView([match.lat, match.lon], 13);
