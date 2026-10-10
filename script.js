@@ -54,6 +54,7 @@ let stations = [];
 let visibleStations = [];
 let activeFuel = "gas95";
 let historyPoints = [];
+let stationsLoadedFromLive = false;
 
 const fallbackStations = [
   {
@@ -569,6 +570,7 @@ async function loadStations() {
     const list = Array.isArray(payload.ListaEESSPrecio) ? payload.ListaEESSPrecio : [];
     saveStationCache(list);
     applyRawStations(list);
+    stationsLoadedFromLive = true;
   } catch (error) {
     if (!stations.length) {
       stations = fallbackStations.map(normalizeStation);
@@ -706,7 +708,7 @@ async function buildHistory() {
     dieselPlus: getAverage("dieselPlus")
   };
   const pointsByDate = new Map(storedPoints.map(point => [point.date, point]));
-  if (today >= HISTORY_START_DATE && !pointsByDate.has(today) &&
+  if (stationsLoadedFromLive && today >= HISTORY_START_DATE && !pointsByDate.has(today) &&
       [currentPoint.gas95, currentPoint.diesel, currentPoint.dieselPlus].some(value => value != null)) {
     pointsByDate.set(today, currentPoint);
   }
