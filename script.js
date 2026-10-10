@@ -524,7 +524,7 @@ function renderStations() {
   if (markersLayer) markersLayer.clearLayers();
   list.innerHTML = "";
 
-  visibleStations.slice(0, 250).forEach(station => {
+  visibleStations.forEach(station => {
     const price = getFuelPrice(station);
     const cls = priceClass(price, min, max);
     const logo = getLogoUrl(station.brand);
@@ -728,8 +728,10 @@ function renderChart() {
   const svg = document.getElementById("historyChart");
   const plot = document.getElementById("chartPlot");
   const tooltip = document.getElementById("chartTooltip");
-  if (!svg || !plot || !historyPoints.length) {
-    if (svg) svg.innerHTML = "";
+  if (!svg || !plot) return;
+  if (!historyPoints.length) {
+    svg.setAttribute("viewBox", "0 0 680 380");
+    svg.innerHTML = '<text x="340" y="185" text-anchor="middle" font-size="14" fill="#64748b">Esperando los primeros datos reales</text>';
     if (tooltip) tooltip.classList.remove("visible");
     return;
   }
