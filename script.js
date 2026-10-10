@@ -661,368 +661,159 @@ function searchLocation(value) {
   }
 }
 
-async function fetchBrentSeries(start, end) {
-  const yahooValues = await fetchBrentFromYahoo(start, end);
-  if (yahooValues.size) return yahooValues;
-  const fredValues = await fetchBrentFromFred(start, end);
-  if (fredValues.size) return fredValues;
-  return fetchBrentFromStooq(start, end);
+const HISTORY_START_DATE = "2026-10-10";
+
+function chartLabel(dateString) {
+  const parts = dateString.split("-").map(Number);
+  return new Date(parts[0], parts[1] - 1, parts[2]).toLocaleDateString("es-ES", {
+    day: "2-digit", month: "2-digit", year: "2-digit"
+  });
 }
 
-async function fetchBrentFromYahoo(start, end) {
-  try {
-    const period1 = Math.floor(start.getTime() / 1000);
-    const period2 = Math.floor((end.getTime() + 86400000) / 1000);
-    const url = `${yahooBrentUrl}?period1=${period1}&period2=${period2}&interval=1d&includePrePost=false`;
-    const json = await fetchJsonReal(url);
-    const result = json.chart?.result?.[0];
-    const timestamps = result?.timestamp || [];
-    const closes = result?.indicators?.quote?.[0]?.close || [];
-    const values = new Map();
-    timestamps.forEach((timestamp, index) => {
-      const close = closes[index];
-      if (close == null) return;
-      const key = new Date(timestamp * 1000).toISOString().slice(0, 10);
-      values.set(key, Number(close));
-    });
-    return values;
-  } catch {
-    return new Map();
-  }
-}
-
-async function fetchBrentFromFred(start, end) {
-  try {
-    const startKey = dateKey(start);
-    const endKey = dateKey(end);
-    const text = await fetchTextReal(`${fredBrentUrl}&cosd=${startKey}&coed=${endKey}`);
-    const values = new Map();
-    text.split(/\r?\n/).slice(1).forEach(line => {
-      const [day, rawValue] = line.split(",");
-      if (!day || day < startKey || day > endKey || rawValue === ".") return;
-      const value = Number(rawValue);
-      if (Number.isFinite(value)) values.set(day, value);
-    });
-    return values;
-  } catch {
-    return new Map();
-  }
-}
-
-async function fetchBrentFromStooq(start, end) {
-  const startKey = dateKey(start);
-  const endKey = dateKey(end);
-  const from = startKey.replace(/-/g, "");
-  const to = endKey.replace(/-/g, "");
-  const symbols = ["brn.f", "bz.f", "lco.f"];
-  for (const symbol of symbols) {
-    try {
-      const text = await fetchTextReal(`https://stooq.com/q/d/l/?s=${symbol}&i=d&d1=${from}&d2=${to}`);
-      const values = new Map();
-      text.split(/\r?\n/).slice(1).forEach(line => {
-        const [day, , , , close] = line.split(",");
-        if (!day || day < startKey || day > endKey || !close || close.toLowerCase() === "null") return;
-        const value = Number(close);
-        if (Number.isFinite(value)) values.set(day, value);
-      });
-      if (values.size) return values;
-    } catch {
-    }
-  }
-  return new Map();
-}
-
-function averageFromRawList(rawList, field) {
-  const values = rawList
-    .filter(item => item && item["Tipo Venta"] === "P")
-    .map(item => parsePrice(item[field]))
-    .filter(value => value != null);
-  if (!values.length) return null;
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
+function chartTodayKey() {
+  const now = new Date();
+  return [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"), String(now.getDate()).padStart(2, "0")].join("-");
 }
 
 async function fetchStoredFuelHistory() {
   try {
-    // Este JSON lo actualiza GitHub Actions una vez al día y se sirve junto a la web.
     const response = await fetch("./data/fuel-history.json", { cache: "no-store" });
-    if (!response.ok) return new Map();
+    if (!response.ok) return [];
     const payload = await response.json();
-    const values = new Map();
-    (Array.isArray(payload.days) ? payload.days : []).forEach(item => {
-      if (!item || !item.date) return;
-      values.set(item.date, {
+    return (Array.isArray(payload.days) ? payload.days : [])
+      .filter(item => item && item.date >= HISTORY_START_DATE)
+      .map(item => ({
+        date: item.date,
+        label: chartLabel(item.date),
         gas95: parsePrice(item.gas95),
         diesel: parsePrice(item.diesel),
         dieselPlus: parsePrice(item.dieselPlus)
-      });
-    });
-    return values;
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
   } catch {
-    return new Map();
+    return [];
   }
 }
 
-async function fetchFuelHistoryDay(day) {
-  const payload = await fetchJsonReal(`${fuelHistoryEndpoint}${dateForApi(day)}`);
-  const list = Array.isArray(payload.ListaEESSPrecio) ? payload.ListaEESSPrecio : [];
-  return {
-    gas95: averageFromRawList(list, fuelConfig.gas95.field),
-    diesel: averageFromRawList(list, fuelConfig.diesel.field),
-    dieselPlus: averageFromRawList(list, fuelConfig.dieselPlus.field)
-  };
-}
-
-async function fetchFuelHistorySeries(dates) {
-  const result = new Map();
-  let cursor = 0;
-  const workers = Array.from({ length: 5 }, async () => {
-    while (cursor < dates.length) {
-      const index = cursor;
-      cursor += 1;
-      const day = dates[index];
-      try {
-        result.set(dateKey(day), await fetchFuelHistoryDay(day));
-      } catch {
-        result.set(dateKey(day), null);
-      }
-    }
-  });
-  await Promise.all(workers);
-  return result;
-}
-
-function buildCurrentAverageHistory(dates) {
-  const averages = {
+async function buildHistory() {
+  const storedPoints = await fetchStoredFuelHistory();
+  const today = chartTodayKey();
+  const currentPoint = {
+    date: today,
+    label: chartLabel(today),
     gas95: getAverage("gas95"),
     diesel: getAverage("diesel"),
     dieselPlus: getAverage("dieselPlus")
   };
-  return dates.map(day => ({
-    date: dateKey(day),
-    label: day.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit" }),
-    brent: null,
-    gas95: averages.gas95,
-    diesel: averages.diesel,
-    dieselPlus: averages.dieselPlus
-  }));
-}
-
-async function buildHistory() {
-  const today = new Date();
-  const dates = Array.from({ length: 30 }, (_, index) => {
-    const day = new Date(today);
-    day.setDate(today.getDate() - (29 - index));
-    return day;
-  });
-  const rangeLabel = `${dates[0].toLocaleDateString("es-ES")} - ${dates[dates.length - 1].toLocaleDateString("es-ES")}`;
-
-  const cached = loadHistoryCache(dates);
-  if (cached && cached.length) {
-    historyPoints = cached;
-    setChartSubtitle(`Ultimos 30 dias reales (${rangeLabel}). Eje izquierdo en €/L y eje derecho en $/barril`);
-    renderChart();
-    return;
+  const pointsByDate = new Map(storedPoints.map(point => [point.date, point]));
+  if (today >= HISTORY_START_DATE && !pointsByDate.has(today) &&
+      [currentPoint.gas95, currentPoint.diesel, currentPoint.dieselPlus].some(value => value != null)) {
+    pointsByDate.set(today, currentPoint);
   }
+  historyPoints = [...pointsByDate.values()].sort((a, b) => a.date.localeCompare(b.date));
 
+  const subtitle = document.getElementById("chartSubtitle");
   if (!historyPoints.length) {
-    historyPoints = buildCurrentAverageHistory(dates);
-    setChartSubtitle(`Cargando historico real de los ultimos 30 dias (${rangeLabel})...`);
-    renderChart();
-  }
-
-  const [brentMap, fuelHistoryMap, storedHistoryMap] = await Promise.all([
-    fetchBrentSeries(dates[0], dates[dates.length - 1]),
-    fetchFuelHistorySeries(dates),
-    fetchStoredFuelHistory()
-  ]);
-  const dailyAverageMap = loadDailyAverageMap();
-  const estimatedBrentMap = brentMap.size ? brentMap : buildEstimatedBrentMap(dates);
-  const estimatedFuelHistory = buildEstimatedFuelHistory(dates);
-  let carryBrent = null;
-  let carryFuel = {
-    gas95: null,
-    diesel: null,
-    dieselPlus: null
-  };
-
-  const nextPoints = dates.map(day => {
-    const key = dateKey(day);
-    if (estimatedBrentMap.has(key)) carryBrent = estimatedBrentMap.get(key);
-    const storedFuel = storedHistoryMap.get(key);
-    const fetchedFuel = fuelHistoryMap.get(key);
-    const realFuel = storedFuel && (storedFuel.gas95 != null || storedFuel.diesel != null || storedFuel.dieselPlus != null)
-      ? storedFuel
-      : fetchedFuel || dailyAverageMap.get(key);
-    if (realFuel && (realFuel.gas95 != null || realFuel.diesel != null || realFuel.dieselPlus != null)) {
-      carryFuel = {
-        gas95: realFuel.gas95 ?? carryFuel.gas95,
-        diesel: realFuel.diesel ?? carryFuel.diesel,
-        dieselPlus: realFuel.dieselPlus ?? carryFuel.dieselPlus
-      };
-    }
-    return {
-      date: key,
-      label: day.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit" }),
-      brent: carryBrent,
-      gas95: carryFuel.gas95,
-      diesel: carryFuel.diesel,
-      dieselPlus: carryFuel.dieselPlus
-    };
-  });
-  const realFuelDays = countRealFuelDays(nextPoints);
-  if (realFuelDays < 3) {
-    nextPoints.forEach((point, index) => {
-      point.gas95 = estimatedFuelHistory[index].gas95;
-      point.diesel = estimatedFuelHistory[index].diesel;
-      point.dieselPlus = estimatedFuelHistory[index].dieselPlus;
-    });
-  }
-  fillMissingHistoryValues(nextPoints, ["brent", "gas95", "diesel", "dieselPlus"]);
-
-  if (hasFuelHistory(nextPoints) && hasBrentHistory(nextPoints)) {
-    historyPoints = nextPoints;
-    if (brentMap.size && realFuelDays >= 3) saveHistoryCache(historyPoints, dates);
-    const brentText = brentMap.size ? "Brent real" : "Brent estimado";
-    const fuelText = realFuelDays >= 3 ? "medias oficiales" : "tendencia estimada con la media actual";
-    setChartSubtitle(`Ultimos 30 dias (${rangeLabel}). ${fuelText} y ${brentText}`);
-  } else if (hasFuelHistory(nextPoints)) {
-    historyPoints = nextPoints;
-    setChartSubtitle(`Medias de carburante cargadas. No se pudo cargar el Brent (${rangeLabel})`);
-  } else if (isUsableHistory(nextPoints)) {
-    historyPoints = historyPoints.map((point, index) => ({
-      ...point,
-      brent: nextPoints[index]?.brent ?? point.brent
-    }));
-    setChartSubtitle(`Brent real cargado. No se pudo cargar el historico oficial de carburantes (${rangeLabel})`);
+    if (subtitle) subtitle.textContent = "Esperando datos oficiales de hoy para iniciar el historial.";
   } else {
-    setChartSubtitle(`No se pudo cargar el historico real. Mostrando medias actuales (${rangeLabel})`);
+    if (subtitle) subtitle.textContent = "Datos diarios disponibles: " + historyPoints[0].label + " – " +
+      historyPoints[historyPoints.length - 1].label + ". Solo medias reales; sin estimaciones.";
   }
   renderChart();
-}
-
-function scale(values, step, digits) {
-  const usable = values.filter(value => value != null && Number.isFinite(value));
-  if (!usable.length) return { min: 0, max: step, ticks: [0, step], digits };
-  const min = Math.floor(Math.min(...usable) / step) * step;
-  let max = Math.ceil(Math.max(...usable) / step) * step;
-  if (max <= min) max = min + step;
-  const ticks = [];
-  for (let value = min; value <= max + step / 2; value += step) {
-    ticks.push(Number(value.toFixed(digits)));
-  }
-  return { min, max, ticks, digits };
-}
-
-function smoothPath(points) {
-  if (points.length < 2) return "";
-  let path = `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`;
-  for (let i = 0; i < points.length - 1; i += 1) {
-    const p0 = points[i - 1] || points[i];
-    const p1 = points[i];
-    const p2 = points[i + 1];
-    const p3 = points[i + 2] || p2;
-    const s = 0.16;
-    const cp1x = p1.x + (p2.x - p0.x) * s;
-    const cp1y = p1.y + (p2.y - p0.y) * s;
-    const cp2x = p2.x - (p3.x - p1.x) * s;
-    const cp2y = p2.y - (p3.y - p1.y) * s;
-    path += ` C ${cp1x.toFixed(2)} ${cp1y.toFixed(2)}, ${cp2x.toFixed(2)} ${cp2y.toFixed(2)}, ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`;
-  }
-  return path;
 }
 
 function renderChart() {
   const svg = document.getElementById("historyChart");
   const plot = document.getElementById("chartPlot");
-  if (!svg || !plot || !historyPoints.length) return;
+  const tooltip = document.getElementById("chartTooltip");
+  if (!svg || !plot || !historyPoints.length) {
+    if (svg) svg.innerHTML = "";
+    if (tooltip) tooltip.classList.remove("visible");
+    return;
+  }
 
-  const width = Math.max(680, plot.clientWidth || 680);
-  const height = Math.max(380, plot.clientHeight || 380);
-  const padding = { top: 28, right: 58, bottom: 42, left: 58 };
+  const width = Math.max(320, plot.clientWidth || 680);
+  const height = Math.max(320, plot.clientHeight || 380);
+  const padding = { top: 28, right: 24, bottom: 48, left: 62 };
   const plotWidth = width - padding.left - padding.right;
   const plotHeight = height - padding.top - padding.bottom;
-  const fuelScale = scale(historyPoints.flatMap(point => [point.gas95, point.diesel, point.dieselPlus]), 0.05, 3);
-  const brentScale = scale(historyPoints.map(point => point.brent), 5, 0);
-  const x = index => padding.left + (plotWidth * index) / Math.max(1, historyPoints.length - 1);
-  const yFuel = value => padding.top + ((fuelScale.max - value) / (fuelScale.max - fuelScale.min)) * plotHeight;
-  const yBrent = value => padding.top + ((brentScale.max - value) / (brentScale.max - brentScale.min)) * plotHeight;
+  const allValues = historyPoints.flatMap(point => [point.gas95, point.diesel, point.dieselPlus])
+    .filter(value => value != null && Number.isFinite(value));
+  let min = allValues.length ? Math.floor(Math.min(...allValues) * 20) / 20 : 0;
+  let max = allValues.length ? Math.ceil(Math.max(...allValues) * 20) / 20 : 1;
+  if (max <= min) {
+    min = Math.max(0, min - 0.05);
+    max += 0.05;
+  }
+  const ticks = Array.from({ length: 5 }, (_, index) => min + ((max - min) * index) / 4);
+  const x = index => padding.left + plotWidth * (historyPoints.length <= 1 ? 0.5 : index / (historyPoints.length - 1));
+  const y = value => padding.top + ((max - value) / (max - min)) * plotHeight;
 
-  const grid = fuelScale.ticks.map(tick => {
-    const y = yFuel(tick);
-    return `<line x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" stroke="rgba(100,116,139,.38)" stroke-width="1.6"/>
-      <text x="${padding.left - 10}" y="${y + 4}" text-anchor="end" font-size="11" font-weight="700" fill="#475569">${tick.toFixed(3)}</text>`;
+  const grid = ticks.map(value => {
+    const yy = y(value);
+    return '<line x1="' + padding.left + '" y1="' + yy + '" x2="' + (width - padding.right) +
+      '" y2="' + yy + '" stroke="rgba(100,116,139,.25)" stroke-width="1"/>' +
+      '<text x="' + (padding.left - 10) + '" y="' + (yy + 4) +
+      '" text-anchor="end" font-size="11" fill="#64748b">' + value.toFixed(3) + '</text>';
   }).join("");
-  const rightAxis = brentScale.ticks.map(tick => {
-    const y = yBrent(tick);
-    return `<text x="${width - padding.right + 10}" y="${y + 4}" font-size="11" font-weight="700" fill="#92400e">${tick}</text>`;
-  }).join("");
-  const xTicks = historyPoints.filter((_, index) => index % 3 === 0 || index === historyPoints.length - 1).map((point, index) => {
-    const originalIndex = historyPoints.indexOf(point);
-    const tx = x(originalIndex);
-    return `<line x1="${tx}" y1="${height - padding.bottom}" x2="${tx}" y2="${height - padding.bottom + 5}" stroke="#94a3b8"/>
-      <text x="${tx}" y="${height - 14}" text-anchor="middle" font-size="10" fill="#64748b">${point.label}</text>`;
-  }).join("");
-  const verticalGrid = Array.from({ length: 15 }, (_, index) => {
-    const gx = padding.left + (plotWidth * index) / 14;
-    return `<line x1="${gx}" y1="${padding.top}" x2="${gx}" y2="${height - padding.bottom}" stroke="rgba(148,163,184,.10)" stroke-width="1"/>`;
+
+  const labelStep = Math.max(1, Math.ceil(historyPoints.length / 8));
+  const labels = historyPoints.map((point, index) => {
+    if (index % labelStep !== 0 && index !== historyPoints.length - 1) return "";
+    return '<text x="' + x(index) + '" y="' + (height - 16) +
+      '" text-anchor="middle" font-size="10" fill="#64748b">' + point.label + '</text>';
   }).join("");
 
   const series = [
-    { key: "brent", color: "#334155", y: yBrent, width: 2.6 },
-    { key: "gas95", color: "#16a34a", y: yFuel, width: 2.8 },
-    { key: "diesel", color: "#f59e0b", y: yFuel, width: 2.8 },
-    { key: "dieselPlus", color: "#dc2626", y: yFuel, width: 2.8 }
+    { key: "gas95", color: "#16a34a" },
+    { key: "diesel", color: "#f59e0b" },
+    { key: "dieselPlus", color: "#dc2626" }
   ];
-  const lines = series.map(item => {
-    const coords = historyPoints
-      .map((point, index) => ({ x: x(index), y: point[item.key] == null ? null : item.y(point[item.key]) }))
-      .filter(point => point.y != null && Number.isFinite(point.y));
-    const dots = coords.map(point => `<circle cx="${point.x}" cy="${point.y}" r="2.6" fill="${item.color}"/>`).join("");
-    if (coords.length < 2) return dots;
-    return `<path d="${smoothPath(coords)}" fill="none" stroke="${item.color}" stroke-width="${item.width}" stroke-linecap="round" stroke-linejoin="round"/>${dots}`;
+  const paths = series.map(item => {
+    const points = historyPoints.map((point, index) => ({
+      x: x(index), y: point[item.key] == null ? null : y(point[item.key])
+    })).filter(point => point.y != null && Number.isFinite(point.y));
+    if (!points.length) return "";
+    const dots = points.map(point => '<circle cx="' + point.x + '" cy="' + point.y +
+      '" r="3.2" fill="' + item.color + '"/>').join("");
+    if (points.length === 1) return dots;
+    const path = points.map((point, index) => (index === 0 ? "M" : "L") + " " +
+      point.x.toFixed(2) + " " + point.y.toFixed(2)).join(" ");
+    return '<path d="' + path + '" fill="none" stroke="' + item.color +
+      '" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>' + dots;
   }).join("");
 
-  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
-  svg.innerHTML = `<rect width="${width}" height="${height}" fill="transparent"/>${grid}${verticalGrid}${rightAxis}
-    <line x1="${padding.left}" y1="${height - padding.bottom}" x2="${width - padding.right}" y2="${height - padding.bottom}" stroke="#94a3b8"/>
-    <line x1="${padding.left}" y1="${padding.top}" x2="${padding.left}" y2="${height - padding.bottom}" stroke="#94a3b8"/>
-    <line x1="${width - padding.right}" y1="${padding.top}" x2="${width - padding.right}" y2="${height - padding.bottom}" stroke="#cbd5e1"/>
-    ${xTicks}${lines}`;
-
+  svg.setAttribute("viewBox", "0 0 " + width + " " + height);
+  svg.innerHTML = '<rect width="' + width + '" height="' + height + '" fill="transparent"/>' + grid +
+    '<line x1="' + padding.left + '" y1="' + (height - padding.bottom) + '" x2="' +
+    (width - padding.right) + '" y2="' + (height - padding.bottom) + '" stroke="#94a3b8"/>' +
+    '<line x1="' + padding.left + '" y1="' + padding.top + '" x2="' + padding.left +
+    '" y2="' + (height - padding.bottom) + '" stroke="#94a3b8"/>' + labels + paths;
   bindChartTooltip(plot, padding, width, historyPoints);
 }
 
 function bindChartTooltip(plot, padding, width, points) {
   const tooltip = document.getElementById("chartTooltip");
   if (!tooltip) return;
-
   plot.onmouseleave = () => tooltip.classList.remove("visible");
   plot.onmousemove = event => {
     const rect = plot.getBoundingClientRect();
-    const plotLeft = (padding.left / width) * rect.width;
-    const plotRight = rect.width - (padding.right / width) * rect.width;
-    const usable = Math.max(1, plotRight - plotLeft);
-    const localX = Math.max(plotLeft, Math.min(plotRight, event.clientX - rect.left));
-    const ratio = (localX - plotLeft) / usable;
-    const index = Math.max(0, Math.min(points.length - 1, Math.round(ratio * (points.length - 1))));
+    const left = (padding.left / width) * rect.width;
+    const right = rect.width - (padding.right / width) * rect.width;
+    const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left - left) / Math.max(1, right - left)));
+    const index = points.length <= 1 ? 0 : Math.round(ratio * (points.length - 1));
     const point = points[index];
-    const left = Math.max(8, Math.min(rect.width - 210, localX - 96));
-
-    tooltip.innerHTML = `
-      <div class="tooltip-date">${point.label}</div>
-      ${[
-        ["Brent", "#334155", point.brent == null ? "--" : `${point.brent.toFixed(2)} $`],
-        ["Gas 95", "#16a34a", point.gas95 == null ? "--" : `${point.gas95.toFixed(3)} €/L`],
-        ["Diesel", "#f59e0b", point.diesel == null ? "--" : `${point.diesel.toFixed(3)} €/L`],
-        ["Diesel +", "#dc2626", point.dieselPlus == null ? "--" : `${point.dieselPlus.toFixed(3)} €/L`]
-      ].map(row => `
-        <div class="tooltip-row">
-          <span class="tooltip-label"><i class="tooltip-dot" style="background:${row[1]}"></i>${row[0]}</span>
-          <span class="tooltip-value">${row[2]}</span>
-        </div>
-      `).join("")}
-    `;
-    tooltip.style.left = `${left}px`;
+    const rows = [
+      ["Gasolina 95", "#16a34a", point.gas95],
+      ["Diésel", "#f59e0b", point.diesel],
+      ["Diésel prémium", "#dc2626", point.dieselPlus]
+    ];
+    tooltip.innerHTML = '<div class="tooltip-date">' + point.label + '</div>' + rows.map(row =>
+      '<div class="tooltip-row"><span class="tooltip-label"><i class="tooltip-dot" style="background:' +
+      row[1] + '"></i>' + row[0] + '</span><span class="tooltip-value">' +
+      (row[2] == null ? "Sin datos" : Number(row[2]).toFixed(3) + " €/L") + '</span></div>'
+    ).join("");
+    tooltip.style.left = Math.max(8, Math.min(rect.width - 220, event.clientX - rect.left - 100)) + "px";
     tooltip.style.top = "14px";
     tooltip.classList.add("visible");
   };
