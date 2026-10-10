@@ -2,7 +2,7 @@ name: Actualizar histórico de carburantes
 
 on:
   schedule:
-    - cron: "15 6 * * *"
+    - cron: "30 16 * * *"
   workflow_dispatch:
 
 permissions:
