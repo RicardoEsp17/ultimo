@@ -60,18 +60,17 @@
     <section class="chart-panel">
       <div class="chart-head">
         <div>
-          <h2>Evolucion de 30 dias</h2>
-          <p id="chartSubtitle">Eje izquierdo en €/L y eje derecho en $ por barril</p>
+          <h2>Historial del precio medio desde hoy</h2>
+          <p id="chartSubtitle">El historial empieza hoy y se actualiza diariamente con medias reales.</p>
         </div>
         <div class="legend">
-          <span><i style="background:#334155"></i>Brent</span>
           <span><i style="background:#16a34a"></i>Gas 95</span>
           <span><i style="background:#f59e0b"></i>Diesel</span>
           <span><i style="background:#dc2626"></i>Diesel +</span>
         </div>
       </div>
       <div class="chart-plot" id="chartPlot">
-        <svg id="historyChart" aria-label="Historico de precios"></svg>
+        <svg id="historyChart" aria-label="Historial diario de precios medios de carburantes"></svg>
         <div class="chart-tooltip" id="chartTooltip"></div>
       </div>
     </section>
