@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
-"""Actualiza el histórico diario con medias calculadas desde la API oficial española."""
+"""Guarda una media diaria de carburantes desde el día inicial del nuevo histórico."""
 import json
-import os
-import time
-import urllib.error
 import urllib.request
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-API = "https://energia.serviciosmin.gob.es/ServiciosRestCarburantes/PreciosCarburantes/EstacionesTerrestresHist/"
+API_CURRENT = "https://energia.serviciosmin.gob.es/ServiciosRestCarburantes/PreciosCarburantes/EstacionesTerrestres/"
 OUTPUT = Path("data/fuel-history.json")
+START_DATE = date(2026, 10, 10)
 FIELDS = {
     "gas95": "Precio Gasolina 95 E5",
     "diesel": "Precio Gasoleo A",
@@ -22,24 +20,28 @@ def parse_price(value):
     if value is None or str(value).strip() == "":
         return None
     try:
-        return float(str(value).replace(",", "."))
+        price = float(str(value).replace(",", "."))
+        return price if price > 0 else None
     except ValueError:
         return None
 
 
-def fetch_day(day):
-    url = API + day.strftime("%d-%m-%Y")
-    request = urllib.request.Request(url, headers={"User-Agent": "ultimo-fuel-history/1.0"})
-    with urllib.request.urlopen(request, timeout=25) as response:
+def fetch_today(day):
+    request = urllib.request.Request(
+        API_CURRENT,
+        headers={"User-Agent": "ultimo-fuel-history/1.0"},
+    )
+    with urllib.request.urlopen(request, timeout=30) as response:
         payload = json.loads(response.read().decode("utf-8-sig"))
     stations = payload.get("ListaEESSPrecio", [])
     result = {"date": day.isoformat()}
     for key, field in FIELDS.items():
         prices = [
-            price for item in stations
+            price
+            for item in stations
             if item.get("Tipo Venta") == "P"
             for price in [parse_price(item.get(field))]
-            if price is not None and price > 0
+            if price is not None
         ]
         result[key] = round(sum(prices) / len(prices), 6) if prices else None
     result["stations"] = len(stations)
@@ -48,46 +50,45 @@ def fetch_day(day):
 
 def main():
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    if OUTPUT.exists():
-        try:
-            existing = json.loads(OUTPUT.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            existing = {}
-    else:
+    try:
+        existing = json.loads(OUTPUT.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
         existing = {}
 
+    today = datetime.now(ZoneInfo("Europe/Madrid")).date()
+    if today < START_DATE:
+        raise SystemExit(f"El histórico comienza el {START_DATE.isoformat()}.")
+
+    # Descarta cualquier dato anterior al nuevo comienzo: no se inventa historia.
     by_date = {
         item["date"]: item
         for item in existing.get("days", [])
-        if isinstance(item, dict) and item.get("date")
+        if isinstance(item, dict)
+        and item.get("date")
+        and item["date"] >= START_DATE.isoformat()
     }
-    today = datetime.now(ZoneInfo("Europe/Madrid")).date()
 
-    # Backfill the most recent 30 days on first run, then refresh the same
-    # window daily so that delayed official data is picked up when published.
-    for offset in range(29, -1, -1):
-        day = today - timedelta(days=offset)
-        try:
-            item = fetch_day(day)
-            if any(item.get(key) is not None for key in FIELDS):
-                by_date[day.isoformat()] = item
-                print(f"{day.isoformat()}: medias actualizadas")
-            else:
-                print(f"{day.isoformat()}: la API no devuelve precios; se conserva el dato anterior")
-        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError) as error:
-            print(f"{day.isoformat()}: error al consultar API: {error}")
-        time.sleep(0.35)
+    try:
+        item = fetch_today(today)
+        if any(item.get(key) is not None for key in FIELDS):
+            by_date[today.isoformat()] = item
+            print(f"{today.isoformat()}: media oficial actualizada")
+        else:
+            print(f"{today.isoformat()}: la API no devolvió precios; se conserva el registro anterior")
+    except Exception as error:
+        print(f"No se pudo actualizar la media de hoy: {error}")
+        if today.isoformat() not in by_date:
+            raise
 
-    # Keep a year of daily records; the graph displays the latest 30.
-    cutoff = today - timedelta(days=364)
-    days = [by_date[key] for key in sorted(by_date) if date.fromisoformat(key) >= cutoff]
+    days = [by_date[key] for key in sorted(by_date)]
     output = {
-        "source": "Ministerio para la Transición Ecológica y el Reto Demográfico - API de precios de carburantes",
+        "source": "API oficial de precios de carburantes del Gobierno de España",
+        "startDate": START_DATE.isoformat(),
         "updatedAt": datetime.now(ZoneInfo("Europe/Madrid")).isoformat(timespec="seconds"),
         "days": days,
     }
     OUTPUT.write_text(json.dumps(output, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(f"Guardados {len(days)} días en {OUTPUT}")
+    print(f"Guardados {len(days)} días desde {START_DATE.isoformat()}")
 
 
 if __name__ == "__main__":
