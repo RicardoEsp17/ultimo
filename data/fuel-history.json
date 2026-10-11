@@ -1,6 +1,14 @@
 {
   "source": "API oficial de precios de carburantes del Gobierno de España",
   "startDate": "2026-10-10",
-  "updatedAt": null,
-  "days": []
+  "updatedAt": "2026-10-11T22:30:58+02:00",
+  "days": [
+    {
+      "date": "2026-10-11",
+      "gas95": 1.787027,
+      "diesel": 1.888509,
+      "dieselPlus": 1.980916,
+      "stations": 11515
+    }
+  ]
 }
