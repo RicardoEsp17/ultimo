@@ -472,7 +472,10 @@ function popupHtml(station) {
       <div class="popup-head">
         <div class="popup-title-row">
           <span class="popup-brand">${station.brand}</span>
-          <a class="route-button" href="${mapsUrl}" target="_blank" rel="noopener">Como llegar</a>
+          <div class="popup-actions">
+            <a class="route-button" href="${mapsUrl}" target="_blank" rel="noopener">Cómo llegar</a>
+            <button class="copy-coordinates-button" type="button" onclick="copyCoordinates(${station.lat}, ${station.lon}, this)">Copiar coordenadas</button>
+          </div>
         </div>
         <div class="popup-sub">${station.address}, ${station.city}</div>
       </div>
@@ -483,6 +486,35 @@ function popupHtml(station) {
       </div>
     </div>
   `;
+}
+
+
+async function copyCoordinates(lat, lon, button) {
+  const coordinates = `${lat}, ${lon}`;
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(coordinates);
+    } else {
+      const field = document.createElement("textarea");
+      field.value = coordinates;
+      field.style.position = "fixed";
+      field.style.opacity = "0";
+      document.body.appendChild(field);
+      field.select();
+      const copied = document.execCommand("copy");
+      field.remove();
+      if (!copied) throw new Error("No se pudo copiar");
+    }
+    const previousText = button.textContent;
+    button.textContent = "¡Copiadas!";
+    button.classList.add("copied");
+    setTimeout(() => {
+      button.textContent = previousText;
+      button.classList.remove("copied");
+    }, 1600);
+  } catch (error) {
+    window.prompt("Copia estas coordenadas:", coordinates);
+  }
 }
 
 function getMapVisibleWidthKm() {
@@ -562,7 +594,6 @@ async function loadStations() {
     applyRawStations(cached);
     renderFuelCards();
     renderStations();
-    buildHistory();
   }
 
   try {
@@ -579,8 +610,6 @@ async function loadStations() {
 
   renderFuelCards();
   renderStations();
-  saveDailyAverageSnapshot();
-  await buildHistory();
 }
 
 function selectFuel(fuel) {
